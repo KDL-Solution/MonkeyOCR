@@ -11,7 +11,10 @@ from qwen_vl_utils import process_vision_info
 from PIL import Image
 import requests
 from typing import List, Union
-from openai import OpenAI
+from openai import OpenAI, AsyncOpenAI
+import io
+import base64
+import asyncio
 
 
 class MonkeyOCR:
@@ -104,6 +107,16 @@ class MonkeyOCR:
         elif chat_backend == 'vllm':
             logger.info('Use vLLM as backend')
             self.chat_model = MonkeyChat_vLLM(chat_path)
+        elif chat_backend == 'vllm_api':
+            logger.info('Use vLLM API as backend')
+            api_config = self.configs.get('api_config', {})
+            if not api_config:
+                raise ValueError("API configuration is required for vLLM API backend.")
+            self.chat_model = MonkeyChat_vLLM(
+                url=api_config.get('url'),
+                model_name=api_config.get('model_name'),
+                api_key=api_config.get('api_key', None)
+            )
         elif chat_backend == 'transformers':
             logger.info('Use transformers as backend')
             batch_size = self.chat_config.get('batch_size', 5)
@@ -168,7 +181,8 @@ class MonkeyChat_vLLM:
         self.pipe = LLM(model=model_path,
                         max_seq_len_to_capture=10240,
                         mm_processor_kwargs={'use_fast': True},
-                        gpu_memory_utilization=self._auto_gpu_mem_ratio(0.9))
+                        gpu_memory_utilization=self._auto_gpu_mem_ratio(0.48)
+                    )
         self.gen_config = SamplingParams(max_tokens=4096,temperature=0,repetition_penalty=1.05)
     
     def _auto_gpu_mem_ratio(self, ratio):
@@ -193,6 +207,112 @@ class MonkeyChat_vLLM:
         outputs = self.pipe.generate(inputs, sampling_params=self.gen_config)
         return [o.outputs[0].text for o in outputs]
 
+class MonkeyChat_vLLM:
+    def __init__(self, url: str, model_name: str, api_key: str = "EMPTY"):
+        
+        self.model_name = model_name
+        self.client = OpenAI(
+            base_url=url,
+            api_key=api_key,  
+        )
+        self.max_tokens = 4096
+        self.temperature = 0
+        
+    def batch_inference(self, images, questions):
+        results = []
+        
+        for image, question in zip(images, questions):
+            try:
+                # Load and encode image
+                pil_image = load_image(image, max_size=1600)
+                buffered = io.BytesIO()
+                pil_image.save(buffered, format="JPEG")
+                img_base64 = base64.b64encode(buffered.getvalue()).decode()
+                
+                # Create messages in OpenAI format
+                messages = [
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant."
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": question
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{img_base64}"
+                                }
+                            }
+                        ]
+                    }
+                ]
+                
+                # Make API request
+                response = self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=messages,
+                    max_tokens=self.max_tokens,
+                    temperature=self.temperature
+                )
+                
+                results.append(response.choices[0].message.content)
+                
+            except Exception as e:
+                print(f"Error processing image {len(results)}: {e}")
+                results.append("")
+        
+        return results
+
+    async def async_batch_inference(self, images, questions):
+ 
+        async_client = AsyncOpenAI(
+            base_url=self.client.base_url,
+            api_key=self.client.api_key
+        )
+        
+        
+        async def process_single(image, question):
+            try:
+                pil_image = load_image(image, max_size=1600)
+                
+                buffered = io.BytesIO()
+                pil_image.save(buffered, format="JPEG")
+                img_base64 = base64.b64encode(buffered.getvalue()).decode()
+                
+                messages = [
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": question},
+                            {
+                                "type": "image_url", 
+                                "image_url": {"url": f"data:image/jpeg;base64,{img_base64}"}
+                            }
+                        ]
+                    }
+                ]
+                
+                response = await async_client.chat.completions.create(
+                    model=self.model_name,
+                    messages=messages,
+                    max_tokens=self.max_tokens,
+                    temperature=self.temperature
+                )
+                
+                return response.choices[0].message.content
+            except Exception as e:
+                print(f"Error: {e}")
+                return ""
+        
+        tasks = [process_single(img, q) for img, q in zip(images, questions)]
+        return await asyncio.gather(*tasks)
+    
 class MonkeyChat_transformers:
     def __init__(self, model_path: str, max_batch_size: int = 10, max_new_tokens=4096, device: str = None):
         try:
