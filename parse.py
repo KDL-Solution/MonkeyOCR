@@ -13,7 +13,6 @@ from magic_pdf.data.dataset import PymuDocDataset, ImageDataset
 from magic_pdf.model.doc_analyze_by_custom_model_llm import doc_analyze_llm
 from magic_pdf.model.custom_model import MonkeyOCR
 
-# 定义任务指令
 TASK_INSTRUCTIONS = {
     'text': 'Please output the text content from the image.',
     'formula': 'Please write out the expression of the formula in the image using LaTeX format.',

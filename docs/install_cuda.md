@@ -45,9 +45,9 @@ pip install https://github.com/InternLM/lmdeploy/releases/download/v0.8.0/lmdepl
 ```
 
 > [!IMPORTANT]
-> ### Fixing the **Shared Memory Error** on **RTX 3090 / 4090 / ...** GPUs (Optional)
+> ### Fixing the **Shared Memory Error** on **30/40 series / V100 ...** GPUs (Optional)
 > 
-> Our 3B model runs smoothly on the NVIDIA RTX 3090. However, when using **LMDeploy** as the inference backend, you might run into compatibility issues on **RTX 3090 / 4090** GPUs — typically this error:
+> Our 3B model runs smoothly on the NVIDIA RTX 30/40 series. However, when using **LMDeploy** as the inference backend, you might run into compatibility issues on these GPUs — typically this error:
 > 
 > ```
 > triton.runtime.errors.OutOfResources: out of resource: shared memory

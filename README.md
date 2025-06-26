@@ -130,13 +130,15 @@ Once the API service is running, you can access the API documentation at http://
    docker compose build monkeyocr
    ```
 
-> [!WARNING]
-> 
-> If your GPU is from the 30-series, 40-series, or similar, build the patched image for LMDeploy compatibility:
-> 
+> [!IMPORTANT]
+>
+> If your GPU is from the 30/40-series, V100, or similar, please build the patched Docker image for LMDeploy compatibility:
+>
 > ```bash
 > docker compose build monkeyocr-fix
 > ```
+>
+> Otherwise, you may encounter the following error: `triton.runtime.errors.OutOfResources: out of resource: shared memory`
 
 4. Run the container with the Gradio demo (accessible on port 7860):
 
