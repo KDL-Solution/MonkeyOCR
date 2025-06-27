@@ -42,47 +42,16 @@ def single_task_recognition(input_file, output_dir, MonkeyOCR_model, task):
     
     print(f"Output dir: {local_md_dir}")
     md_writer = FileBasedDataWriter(local_md_dir)
-    
-    
-    # Create dataset instance
-    file_extension = input_file.split(".")[-1].lower()
-    # reader = FileBasedDataReader()
-    # file_bytes = reader.read(input_file)
-    # if file_extension == "pdf":
-    #     ds = PymuDocDataset(file_bytes)
-    # else:
-    #     ds = ImageDataset(file_bytes)
 
-    # Check file type and prepare images
-    # file_extension = input_file.split(".")[-1].lower()
-    images = []
-    # for index in range(len(ds)):
-    #     page_data = ds.get_page(index)
-    #     img_dict = page_data.get_image()
-    #     images.append(img_dict['img'])
-    if file_extension == 'pdf':
-        print("⚠️  WARNING: PDF input detected for single task recognition.")
-        print("⚠️  WARNING: Converting all PDF pages to images for processing.")
-        print("⚠️  WARNING: This may take longer and use more resources than image input.")
-        print("⚠️  WARNING: Consider using individual images for better performance.")
-        
-        try:
-            # Convert PDF pages to PIL images directly
-            print("Converting PDF pages to images...")
-            images = convert_from_path(input_file, dpi=150)
-            print(f"Converted {len(images)} pages to images")
-            
-        except Exception as e:
-            raise RuntimeError(f"Failed to convert PDF to images: {str(e)}")
-            
-    elif file_extension in ['jpg', 'jpeg', 'png']:
+    file_extension = input_file.split(".")[-1].lower()
+    images = []     
+    if file_extension in ['jpg', 'jpeg', 'png']:
         # Load single image
         from PIL import Image
         images = [Image.open(input_file)]
     else:
-        raise ValueError(f"Single task recognition supports PDF and image files, got: {file_extension}")
+        raise ValueError(f"Unsupported file type for single task recognition: {file_extension}. Only image files are supported for single task recognition.")
     
-        
     if task == 'table':
         instruction = TaskInstructions.TABLE 
     elif task == 'formula':

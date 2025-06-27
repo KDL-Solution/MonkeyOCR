@@ -33,21 +33,14 @@ def sanitize_mf(output):
 def sanitize_html(output):
     otsl_match = re.search(r'<otsl>.*?</otsl>', output, flags=re.DOTALL)
     if otsl_match:
-        logger.info(f'OTSL detected in output, converting to HTML..., {output[0:50]}...')
         try:
             otsl_text = otsl_match.group(0)
-            logger.info(f'OTSL text: {otsl_text[0:50]}...')
             stream = StringIO(otsl_text)
             table_tag = DocTagsDocument.from_doctags_and_image_pairs(stream, images=None)
             doc = DoclingDocument.load_from_doctags(table_tag)
             return doc.export_to_html()
         except Exception as e:
-            # OTSL 변환 실패시 원본 반환하거나 에러 처리
-            logger.warning(f"OTSL to HTML conversion failed: {e}")
-            # fallback: OTSL 태그만 제거하고 내용 반환
             return otsl_text.replace('<otsl>', '').replace('</otsl>', '').strip()
-        finally:
-            logger.info(f'OTSL to HTML conversion successful: {otsl_text[0:50]}...')
     
     cleaned = re.match(r'```html.*```', output, flags=re.DOTALL)
     if cleaned is None:
