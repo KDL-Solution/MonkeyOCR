@@ -112,7 +112,7 @@ class MonkeyOCR:
             api_config = self.configs.get('api_config', {})
             if not api_config:
                 raise ValueError("API configuration is required for vLLM API backend.")
-            self.chat_model = MonkeyChat_vLLM(
+            self.chat_model = MonkeyChat_vLLM_API(
                 url=api_config.get('url'),
                 model_name=api_config.get('model_name'),
                 api_key=api_config.get('api_key', None)
@@ -207,7 +207,7 @@ class MonkeyChat_vLLM:
         outputs = self.pipe.generate(inputs, sampling_params=self.gen_config)
         return [o.outputs[0].text for o in outputs]
 
-class MonkeyChat_vLLM:
+class MonkeyChat_vLLM_API:
     def __init__(self, url: str, model_name: str, api_key: str = "EMPTY"):
         
         self.model_name = model_name
@@ -217,6 +217,15 @@ class MonkeyChat_vLLM:
         )
         self.max_tokens = 4096
         self.temperature = 0
+        # health check
+        try:
+            response = self.client.models.list()
+            if not response.data:
+                raise ValueError(f"No models found for model name: {self.model_name}")
+            logger.info("API connection validation successful")
+        except Exception as e:
+            logger.error(f"API connection validation failed: {e}")
+            raise ValueError(f"Invalid API URL or API key. Please check your configuration: {e}")
         
     def batch_inference(self, images, questions):
         results = []
