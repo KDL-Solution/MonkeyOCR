@@ -19,7 +19,6 @@ debug/
 
 # vscode history
 .history
-
 .DS_Store
 .env
 

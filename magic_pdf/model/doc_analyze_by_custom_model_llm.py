@@ -20,8 +20,9 @@ def doc_analyze_llm(
     end_page_id = end_page_id if end_page_id else len(dataset) - 1
 
     device = MonkeyOCR_model.device
+    backend = MonkeyOCR_model.chat_backend
 
-    batch_model = BatchAnalyzeLLM(model=MonkeyOCR_model)
+    batch_model = BatchAnalyzeLLM(model=MonkeyOCR_model, backend=backend)
 
     model_json = []
     doc_analyze_start = time.time()

@@ -307,7 +307,7 @@ class Doc(PageableData):
     def __init__(self, doc: fitz.Page):
         self._doc = doc
 
-    def get_image(self):
+    def get_image(self) -> dict:
         """Return the image info.
 
         Returns:

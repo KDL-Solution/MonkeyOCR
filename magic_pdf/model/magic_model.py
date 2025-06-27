@@ -22,6 +22,14 @@ class PosRelationEnum(enum.Enum):
 
 class MagicModel:
 
+    def __init__(self, model_list: list, docs: Dataset):
+        self.__model_list = model_list
+        self.__docs = docs
+        self.__fix_axis()
+        self.__fix_by_remove_low_confidence()
+        self.__fix_by_remove_high_iou_and_low_confidence()
+        self.__fix_footnote()
+        
     def __fix_axis(self):
         for model_page_info in self.__model_list:
             need_remove_list = []
@@ -101,14 +109,6 @@ class MagicModel:
                         continue
             for need_remove in need_remove_list:
                 layout_dets.remove(need_remove)
-
-    def __init__(self, model_list: list, docs: Dataset):
-        self.__model_list = model_list
-        self.__docs = docs
-        self.__fix_axis()
-        self.__fix_by_remove_low_confidence()
-        self.__fix_by_remove_high_iou_and_low_confidence()
-        self.__fix_footnote()
 
     def _bbox_distance(self, bbox1, bbox2):
         left, right, bottom, top = bbox_relative_pos(bbox1, bbox2)

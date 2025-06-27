@@ -1,6 +1,7 @@
 import os
 import torch
 from magic_pdf.config.constants import *
+from magic_pdf.config.chat_content_type import LoraType
 from magic_pdf.model.sub_modules.model_init import AtomModelSingleton
 from magic_pdf.model.model_list import AtomicModel
 from magic_pdf.utils.load_image import load_image, encode_image_base64
@@ -99,42 +100,47 @@ class MonkeyOCR:
         logger.info(f'layoutreader model loaded: {self.layout_reader_name}')
 
         self.chat_config = self.configs.get('chat_config', {})
-        chat_backend = self.chat_config.get('backend', 'lmdeploy')
-        chat_path = self.chat_config.get('weight_path', 'model_weight/Recognition')
-        if chat_backend == 'lmdeploy':
-            logger.info('Use LMDeploy as backend')
+        self.chat_backend = self.chat_config.get('backend', 'lmdeploy')
+        backend_config = self.chat_config.get('backend_config', {})
+        backend_config = backend_config.get(self.chat_backend, {})
+        if self.chat_backend == 'lmdeploy':
+            logger.info('Use LMDeploy as backend')    
+            chat_path = backend_config.get('weight_path', None)
             self.chat_model = MonkeyChat_LMDeploy(chat_path)
-        elif chat_backend == 'vllm':
+        elif self.chat_backend == 'vllm':
             logger.info('Use vLLM as backend')
+            chat_path = backend_config.get('weight_path', None)
             self.chat_model = MonkeyChat_vLLM(chat_path)
-        elif chat_backend == 'vllm_api':
+        elif self.chat_backend == 'vllm_api':
             logger.info('Use vLLM API as backend')
-            api_config = self.configs.get('api_config', {})
-            if not api_config:
-                raise ValueError("API configuration is required for vLLM API backend.")
-            self.chat_model = MonkeyChat_vLLM_API(
-                url=api_config.get('url'),
-                model_name=api_config.get('model_name'),
-                api_key=api_config.get('api_key', None)
-            )
-        elif chat_backend == 'transformers':
+            url = backend_config.get('url')
+            model_name = backend_config.get('model_name')
+            lora_config = backend_config.get('loras', {})
+            self.chat_model = MonkeyChat_vLLM_MultiModel_API(
+                url=url,
+                model_name=model_name,
+                lora_config=lora_config,
+            )   
+        elif self.chat_backend == 'transformers':
             logger.info('Use transformers as backend')
-            batch_size = self.chat_config.get('batch_size', 5)
+            chat_path = backend_config.get('weight_path', None)
+            batch_size = backend_config.get('batch_size', 5)
             self.chat_model = MonkeyChat_transformers(chat_path, batch_size, device=self.device)
-        elif chat_backend == 'api':
+        elif self.chat_backend == 'openai_api':
             logger.info('Use API as backend')
-            api_config = self.configs.get('api_config', {})
-            if not api_config:
-                raise ValueError("API configuration is required for API backend.")
+            url = backend_config.get('url')
+            model_name = backend_config.get('model_name')
+            api_key = backend_config.get('api_key', None)
             self.chat_model = MonkeyChat_OpenAIAPI(
-                url=api_config.get('url'),
-                model_name=api_config.get('model_name'),
-                api_key=api_config.get('api_key', None)
+                url=url,
+                model_name=model_name,
+                api_key=api_key,   
             )
         else:
             logger.warning('Use LMDeploy as default backend')
             self.chat_model = MonkeyChat_LMDeploy(chat_path)
         logger.info(f'VLM loaded: {self.chat_model.model_name}')
+        logger.info(f'Chat backend: {self.chat_backend}')
 
 class MonkeyChat_LMDeploy:
     def __init__(self, model_path, engine_config=None): 
@@ -207,120 +213,158 @@ class MonkeyChat_vLLM:
         outputs = self.pipe.generate(inputs, sampling_params=self.gen_config)
         return [o.outputs[0].text for o in outputs]
 
+class MonkeyChat_vLLM_MultiModel_API:
+    def __init__(self, url: str, model_name: str, lora_config: dict, api_key: str = "EMPTY"):
+        self.model_name = model_name
+        self.base_model = MonkeyChat_vLLM_API(
+            url=url,
+            model_name=model_name,
+            api_key=api_key
+        )
+        
+        self.models = {}
+        for lora_type, lora_name in lora_config.items():
+            logger.info(f"Loading LoRA model: {lora_type} -> {lora_name}")
+            self.models[lora_type] = MonkeyChat_vLLM_API(
+                url=url,
+                model_name=lora_name,
+                api_key=api_key
+            )
+    
+    def batch_inference(self, images, questions, model_types: list = None):
+        return asyncio.run(self._async_batch_inference(images, questions, model_types))
+    
+    async def _async_batch_inference(self, images, questions, model_types: list = None):
+        if model_types is None:
+            model_types = [LoraType.BASE] * len(images)
+        
+        if len(model_types) != len(images):
+            raise ValueError("model_types length must match images length")
+        
+        # 모델별로 그룹핑
+        groups = {}
+        for i, (img, q, model_type) in enumerate(zip(images, questions, model_types)):
+            if model_type not in groups:
+                groups[model_type] = {"images": [], "questions": [], "indices": []}
+            groups[model_type]["images"].append(img)
+            groups[model_type]["questions"].append(q)
+            groups[model_type]["indices"].append(i)
+        
+        async def process_group(model_type, group):
+            if model_type == LoraType.BASE or model_type not in self.models:
+                return await self.base_model._async_batch_inference(group["images"], group["questions"])
+            else:
+                return await self.models[model_type]._async_batch_inference(group["images"], group["questions"])
+            
+        
+        # 모든 그룹을 동시에 처리
+        group_tasks = [
+            (model_type, group, process_group(model_type, group))
+            for model_type, group in groups.items()
+        ]
+        
+        # 🚀 동시 실행!
+        group_results = await asyncio.gather(*[task[2] for task in group_tasks])
+        
+        # 원래 순서로 결과 재배치
+        final_results = [None] * len(images)
+        for (model_type, group, _), results in zip(group_tasks, group_results):
+            for result, original_idx in zip(results, group["indices"]):
+                final_results[original_idx] = result
+        
+        return final_results
+    
+    def get_available_models(self):
+        return [LoraType.BASE] + list(self.models.keys())
+    
 class MonkeyChat_vLLM_API:
     def __init__(self, url: str, model_name: str, api_key: str = "EMPTY"):
         
         self.model_name = model_name
-        self.client = OpenAI(
-            base_url=url,
-            api_key=api_key,  
-        )
+        self.base_url = url
+        self.api_key =  api_key
         self.max_tokens = 4096
         self.temperature = 0
-        # health check
+        
+        # Health check
         try:
-            response = self.client.models.list()
+            sync_client = OpenAI(base_url=url, api_key=api_key)
+            response = sync_client.models.list()
             if not response.data:
                 raise ValueError(f"No models found for model name: {self.model_name}")
-            logger.info("API connection validation successful")
+            logger.info("API connection validated successfully.")
         except Exception as e:
             logger.error(f"API connection validation failed: {e}")
-            raise ValueError(f"Invalid API URL or API key. Please check your configuration: {e}")
-        
-    def batch_inference(self, images, questions):
-        results = []
-        
-        for image, question in zip(images, questions):
-            try:
-                # Load and encode image
-                pil_image = load_image(image, max_size=1600)
-                buffered = io.BytesIO()
-                pil_image.save(buffered, format="JPEG")
-                img_base64 = base64.b64encode(buffered.getvalue()).decode()
-                
-                # Create messages in OpenAI format
-                messages = [
-                    {
-                        "role": "system",
-                        "content": "You are a helpful assistant."
-                    },
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": question
-                            },
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{img_base64}"
-                                }
-                            }
-                        ]
-                    }
-                ]
-                
-                # Make API request
-                response = self.client.chat.completions.create(
-                    model=self.model_name,
-                    messages=messages,
-                    max_tokens=self.max_tokens,
-                    temperature=self.temperature
-                )
-                
-                results.append(response.choices[0].message.content)
-                
-            except Exception as e:
-                print(f"Error processing image {len(results)}: {e}")
-                results.append("")
-        
-        return results
+            raise ValueError(f"Invalid API URL or API key: {e}")
 
-    async def async_batch_inference(self, images, questions):
- 
-        async_client = AsyncOpenAI(
-            base_url=self.client.base_url,
-            api_key=self.client.api_key
-        )
+    async def _single_inference(self, image, question):
+        try:
+            async_client = AsyncOpenAI(
+                base_url=self.base_url,
+                api_key=self.api_key
+            )
+            
+            # 이미지 로드 및 인코딩
+            pil_image = load_image(image, max_size=1600)
+            buffered = io.BytesIO()
+            pil_image.save(buffered, format="JPEG")
+            img_base64 = base64.b64encode(buffered.getvalue()).decode()
+            
+            # 메시지 생성
+            messages = [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": question},
+                        {
+                            "type": "image_url", 
+                            "image_url": {"url": f"data:image/jpeg;base64,{img_base64}"}
+                        }
+                    ]
+                }
+            ]
+            
+            # API 호출
+            response = await async_client.chat.completions.create(
+                model=self.model_name,
+                messages=messages,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature
+            )
+            
+            return response.choices[0].message.content
+            
+        except Exception as e:
+            logger.error(f"Error processing single inference: {e}")
+            return f"Error: {str(e)}"
+    
+    def batch_inference(self, images, questions):
+        return asyncio.run(self._async_batch_inference(images, questions))
+
+    async def _async_batch_inference(self, images, questions):
+        logger.info(f"{self.model_name} - Processing batch inference with {len(images)} images and questions.")
+        if len(images) != len(questions):
+            raise ValueError("Images and questions must have the same length")
         
+        # 모든 작업을 비동기로 실행
+        tasks = [
+            self._single_inference(img, q) 
+            for img, q in zip(images, questions)
+        ]
         
-        async def process_single(image, question):
-            try:
-                pil_image = load_image(image, max_size=1600)
-                
-                buffered = io.BytesIO()
-                pil_image.save(buffered, format="JPEG")
-                img_base64 = base64.b64encode(buffered.getvalue()).decode()
-                
-                messages = [
-                    {"role": "system", "content": "You are a helpful assistant."},
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": question},
-                            {
-                                "type": "image_url", 
-                                "image_url": {"url": f"data:image/jpeg;base64,{img_base64}"}
-                            }
-                        ]
-                    }
-                ]
-                
-                response = await async_client.chat.completions.create(
-                    model=self.model_name,
-                    messages=messages,
-                    max_tokens=self.max_tokens,
-                    temperature=self.temperature
-                )
-                
-                return response.choices[0].message.content
-            except Exception as e:
-                print(f"Error: {e}")
-                return ""
+        # 병렬 실행 (에러가 있어도 다른 것들은 계속)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
         
-        tasks = [process_single(img, q) for img, q in zip(images, questions)]
-        return await asyncio.gather(*tasks)
+        # Exception을 문자열로 변환
+        processed_results = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                processed_results.append(f"Error processing item {i}: {str(result)}")
+            else:
+                processed_results.append(result)
+        
+        return processed_results
     
 class MonkeyChat_transformers:
     def __init__(self, model_path: str, max_batch_size: int = 10, max_new_tokens=4096, device: str = None):
