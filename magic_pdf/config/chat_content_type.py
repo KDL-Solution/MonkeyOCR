@@ -11,6 +11,6 @@ class LoraType:
     TEXT = 'text'
 
 class LoraInstructions:
-    BASE = 'Please output the content from the image.'
-    TABLE = 'Please output the table content from the image.'
-    TEXT = 'Please output the text content from the image.'
+    BASE = 'Please output the content from the image. Output only the extracted content, no additional text.'
+    TABLE = 'Please output the table content from the image. Output only the table data, no additional text.'
+    TEXT = 'Please output the text content from the image. Output only the text content, no additional text.'

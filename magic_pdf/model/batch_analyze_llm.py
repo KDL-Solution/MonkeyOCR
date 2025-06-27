@@ -38,7 +38,14 @@ def sanitize_html(output):
             stream = StringIO(otsl_text)
             table_tag = DocTagsDocument.from_doctags_and_image_pairs(stream, images=None)
             doc = DoclingDocument.load_from_doctags(table_tag)
-            return doc.export_to_html()
+            table_html = []
+            for table in doc.tables:
+                table_html.append(table.export_to_html(doc=doc))
+            if len(table_html) == 0:
+                return otsl_text.replace('<otsl>', '').replace('</otsl>', '').strip()
+            # If there are tables, return the first table's HTML
+            table_html = '\n'.join(table_html)
+            return table_html.replace('<otsl>', '').replace('</otsl>', '').strip()
         except Exception as e:
             return otsl_text.replace('<otsl>', '').replace('</otsl>', '').strip()
     
