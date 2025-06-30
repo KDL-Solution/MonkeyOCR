@@ -1,12 +1,12 @@
 # MonkeyOCR
 
-- [🏃‍♂️ 빠른 시작](#quick-start)
-- [📖 팀 내부 사용 가이드 (inference.py & 설정)](#team-guide)
-- [📚 원본 README](#original-readme)
+- [🏃‍♂️ 빠른 시작](#빠른-시작)
+- [📖 팀 내부 사용 가이드](#팀-내부-사용-가이드)
+- [📚 원본 README](#원본-readme)
 
 ## 🏃‍♂️ 빠른 시작
 
-<a name="quick-start"></a>
+<a name="빠른-시작"></a>
 
 ```bash
 # 모델 다운로드
@@ -40,7 +40,7 @@ python inference.py input.pdf -o ./custom_output
 - `{filename}_middle.json`: 중간 처리 결과
 - `images/`: 추출된 이미지들
 
-<a name="team-guide"></a>
+<a name="팀-내부-사용-가이드"></a>
 ## ⚙️ model_configs.yaml 설정 가이드
 
 ### 1. 모델 가중치 설정
@@ -117,10 +117,9 @@ chat_config:
       api_key: sk-xxx  # 또는 환경변수 사용
 ```
 
-<a name="original-readme">
+<a name="원본-readme">
 <details>
 <summary>📚 원본 README (클릭하여 펼치기)</summary>
-
 <div align="center" xmlns="http://www.w3.org/1999/html">
 <h1 align="center">
 MonkeyOCR: Document Parsing with a Structure-Recognition-Relation Triplet Paradigm
