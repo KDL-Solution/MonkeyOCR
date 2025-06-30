@@ -117,7 +117,8 @@ chat_config:
       api_key: sk-xxx  # 또는 환경변수 사용
 ```
 
-<details name="original-readme">
+<a name="original-readme">
+<details>
 <summary>📚 원본 README (클릭하여 펼치기)</summary>
 
 <div align="center" xmlns="http://www.w3.org/1999/html">
