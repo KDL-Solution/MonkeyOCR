@@ -1,3 +1,125 @@
+# MonkeyOCR
+
+- [🏃‍♂️ 빠른 시작](#quick-start)
+- [📖 팀 내부 사용 가이드 (inference.py & 설정)](#team-guide)
+- [📚 원본 README](#original-readme)
+
+## 🏃‍♂️ 빠른 시작
+
+<a name="quick-start"></a>
+
+```bash
+# 모델 다운로드
+python tools/download_model.py
+
+# 단일 PDF 파일 파싱
+python inference.py document.pdf
+
+# 단일 이미지 파일 파싱  
+python inference.py image.jpg
+
+# 텍스트만 추출
+python inference.py image.jpg -t text
+
+# 테이블만 추출
+python inference.py table_image.jpg -t table
+
+# 폴더 전체 파싱
+python inference.py /path/to/folder
+
+# 출력 디렉토리 지정
+python inference.py input.pdf -o ./custom_output
+```
+
+파싱 완료 후 다음 파일들이 생성됩니다:
+- `{filename}.md`: 최종 마크다운 결과
+- `{filename}_layout.pdf`: 레이아웃 분석 결과 시각화
+- `{filename}_spans.pdf`: 스팬 분석 결과 시각화  
+- `{filename}_model.pdf`: 모델 추론 결과 시각화
+- `{filename}_content_list.json`: 구조화된 컨텐츠 리스트
+- `{filename}_middle.json`: 중간 처리 결과
+- `images/`: 추출된 이미지들
+
+<a name="team-guide"></a>
+## ⚙️ model_configs.yaml 설정 가이드
+
+### 1. 모델 가중치 설정
+
+```yaml
+# 기본 설정
+device: cuda 
+models_dir: model_weight  # 모델 파일들이 저장될 디렉토리
+
+# 가중치 파일 경로 (models_dir 기준 상대경로)
+weights:
+  doclayout_yolo: Structure/doclayout_yolo_docstructbench_imgsz1280_2501.pt
+  # 중국어 특화 모델 
+  # doclayout_yolo: Structure/layout_zh.pt  
+  layoutreader: Relation
+
+layout_config: 
+  model: doclayout_yolo
+  reader:
+    name: layoutreader
+```
+
+### 2. vLLM API 백엔드 설정 (권장)
+
+```yaml
+chat_config:
+  backend: vllm_api  
+  backend_config:
+    vllm_api:
+      url: http://192.168.20.58:9800/v1  # vLLM 서버 URL
+      model_name: Qwen2.5-VL-7B-Instruct  
+      loras:  # 특화된 LoRA 모델들
+        table: table_image_otsl  # 테이블 전용 모델
+```
+
+### 3. 다른 백엔드 옵션들
+
+#### LMDeploy (로컬 추론)
+```yaml
+chat_config:
+  backend: lmdeploy
+  backend_config:
+    lmdeploy:
+      weight_path: model_weight/Recognition
+```
+
+#### vLLM (로컬 추론)
+```yaml
+chat_config:
+  backend: vllm
+  backend_config:
+    vllm:
+      weight_path: model_weight/Recognition
+```
+
+#### Transformers (배치 처리)
+```yaml
+chat_config:
+  backend: transformers
+  backend_config:
+    transformers:
+      weight_path: model_weight/Recognition
+      batch_size: 10  # GPU 메모리에 맞게 조정
+```
+
+#### OpenAI API (외부 API)
+```yaml
+chat_config:
+  backend: openai_api
+  backend_config:
+    openai_api:
+      url: https://api.openai.com/v1
+      model_name: gpt-4o
+      api_key: sk-xxx  # 또는 환경변수 사용
+```
+
+<details name="original-readme">
+<summary>📚 원본 README (클릭하여 펼치기)</summary>
+
 <div align="center" xmlns="http://www.w3.org/1999/html">
 <h1 align="center">
 MonkeyOCR: Document Parsing with a Structure-Recognition-Relation Triplet Paradigm
@@ -726,3 +848,5 @@ If you find that our model doesn’t fully meet your needs, feel free to try out
 
 ## Copyright
 Please don’t hesitate to share your valuable feedback — it’s a key motivation that drives us to continuously improve our framework. The current technical report only presents the results of the 3B model. Our model is intended for non-commercial use. If you are interested in larger one, please contact us at xbai@hust.edu.cn or ylliu@hust.edu.cn.
+
+</details>
