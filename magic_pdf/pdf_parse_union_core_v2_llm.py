@@ -680,10 +680,8 @@ def parse_page_core(
                     to_remove_blocks.append(to_remove_block)
                 else:
                     merged_block = right_block
-
         for b in to_remove_blocks:
             blocks.remove(b)
-
 
     interline_equation_blocks = []
     if len(interline_equation_blocks) > 0:
@@ -750,9 +748,7 @@ def parse_page_core(
     spans = ocr_cut_image_and_table(
         spans, page_doc, page_id, pdf_bytes_md5, imageWriter
     )
-
     block_with_spans, spans = fill_spans_in_blocks(all_bboxes, spans, 0.5)
-
     fix_blocks = fix_block_spans_v2(block_with_spans)
 
     merge_title_blocks(fix_blocks)

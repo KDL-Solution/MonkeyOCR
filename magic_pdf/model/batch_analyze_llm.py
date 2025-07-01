@@ -100,20 +100,14 @@ class LLMConfig:
         },
         CategoryId.InterlineEquation_Layout: {
             'task_instruction': TaskInstructions.FORMULA,
-            'lora_instruction': LoraInstructions.BASE, 
-            'lora_type': LoraType.BASE,
             'sanitizer': sanitize_mf
         },
         # 9 : {
         #     'task_instruction': TaskInstructions.TEXT,
-        #     'lora_instruction': LoraInstructions.BASE,
-        #     'lora_type': LoraType.BASE,
         #     'sanitizer': sanitize_md
         # },
         CategoryId.InterlineEquation_YOLO: {
             'task_instruction': TaskInstructions.FORMULA,
-            'lora_instruction': LoraInstructions.BASE,
-            'lora_type': LoraType.BASE,
             'sanitizer': sanitize_mf
         },
         CategoryId.ImageFootnote: {
@@ -148,6 +142,11 @@ class LLMConfig:
     def is_supported(cls, category_id):
         """지원되는 CategoryId인지 확인"""
         return category_id in cls.CATEGORY_MAPPING
+    
+    @classmethod
+    def is_lora_supported(cls, category_id):
+        """CategoryId에 해당하는 LoRA가 지원되는지 확인"""
+        return cls.get_lora_type(category_id) != LoraType.BASE and cls.is_supported(category_id)
 
     
     
@@ -190,7 +189,6 @@ class BatchAnalyzeLLM:
         )
 
         clean_vram(self.model.device, vram_threshold=8)
-
         llm_ocr_start = time.time()
         new_images_all = []
         cids_all = []
@@ -204,9 +202,6 @@ class BatchAnalyzeLLM:
                 new_image, useful_list = crop_img(
                     res, pil_img, crop_paste_x=50, crop_paste_y=50
                 )
-                # save new_image
-                new_image = new_image.convert('RGB')
-                new_image.save("./temp_image.jpg", format='JPEG')
                 new_images.append(new_image)
                 cids.append(res['category_id'])
             
@@ -215,7 +210,6 @@ class BatchAnalyzeLLM:
             page_idxs.append(len(new_images_all) - len(new_images))
         logger.info('VLM OCR start...')
         ocr_result = self.batch_llm_ocr(new_images_all, cids_all)
-        print(images_layout_res)
         for index in range(len(images)):
             ocr_results = []
             layout_res = images_layout_res[index]
@@ -254,7 +248,6 @@ class BatchAnalyzeLLM:
         logger.info(
             f'llm ocr time: {round(time.time() - llm_ocr_start, 2)}, image num: {len(images)}'
         )
-
         return images_layout_res
 
     def batch_llm_ocr(self, images, cat_ids,max_batch_size=8):
@@ -281,9 +274,13 @@ class BatchAnalyzeLLM:
                     ignore_idx.append(i)
                     continue
                 new_images.append(images[i])
-                messages.append(LLMConfig.get_instruction(cat_ids[i], version='lora'))
-                lora_type = LLMConfig.get_lora_type(cat_ids[i])
-                model_types.append(lora_type)
+                if LLMConfig.is_lora_supported(cat_ids[i]):
+                    messages.append(LLMConfig.get_instruction(cat_ids[i], version='lora'))
+                    lora_type = LLMConfig.get_lora_type(cat_ids[i])
+                    model_types.append(lora_type)
+                else:
+                    messages.append(LLMConfig.get_instruction(cat_ids[i]))
+                    model_types.append(LoraType.BASE)
             out = self.model.chat_model.batch_inference(new_images, messages, model_types=model_types)
             outs.extend(out)
         else:

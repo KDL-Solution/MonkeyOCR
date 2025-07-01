@@ -171,6 +171,83 @@ def parse_file(input_file, output_dir, MonkeyOCR_model):
     print("Results saved to ", local_md_dir)
     return local_md_dir
 
+def parse_folder(folder_path, output_dir, MonkeyOCR_model, task=None):
+    """
+    Parse all PDF and image files in a folder
+    
+    Args:
+        folder_path: Input folder path
+        output_dir: Output directory
+        MonkeyOCR_model: Pre-initialized model instance
+        task: Optional task type for single task recognition
+    """
+    print(f"Starting to parse folder: {folder_path}")
+    
+    # Check if folder exists
+    if not os.path.exists(folder_path):
+        raise FileNotFoundError(f"Folder does not exist: {folder_path}")
+    
+    if not os.path.isdir(folder_path):
+        raise ValueError(f"Path is not a directory: {folder_path}")
+    
+    # Find all supported files
+    supported_extensions = {'.pdf', '.jpg', '.jpeg', '.png'}
+    files_to_process = []
+    
+    for root, dirs, files in os.walk(folder_path):
+        for file in files:
+            file_path = os.path.join(root, file)
+            file_ext = os.path.splitext(file)[1].lower()
+            if file_ext in supported_extensions:
+                files_to_process.append(file_path)
+    
+    files_to_process.sort()  # Sort for consistent processing order
+    
+    if not files_to_process:
+        print("No supported files found in the folder.")
+        return
+    
+    print(f"Found {len(files_to_process)} files to process:")
+    for file_path in files_to_process:
+        print(f"  - {file_path}")
+    
+    # Process each file
+    successful_files = []
+    failed_files = []
+    
+    for i, file_path in enumerate(files_to_process, 1):
+        print(f"\n{'='*60}")
+        print(f"Processing file {i}/{len(files_to_process)}: {os.path.basename(file_path)}")
+        print(f"{'='*60}")
+        
+        try:
+            if task:
+                result_dir = single_task_recognition(file_path, output_dir, MonkeyOCR_model, task)
+            else:
+                result_dir = parse_file(file_path, output_dir, MonkeyOCR_model)
+            
+            successful_files.append(file_path)
+            print(f"✅ Successfully processed: {os.path.basename(file_path)}")
+            
+        except Exception as e:
+            failed_files.append((file_path, str(e)))
+            print(f"❌ Failed to process {os.path.basename(file_path)}: {str(e)}")
+    
+    # Summary
+    print(f"\n{'='*60}")
+    print("PROCESSING SUMMARY")
+    print(f"{'='*60}")
+    print(f"Total files: {len(files_to_process)}")
+    print(f"Successful: {len(successful_files)}")
+    print(f"Failed: {len(failed_files)}")
+    
+    if failed_files:
+        print("\nFailed files:")
+        for file_path, error in failed_files:
+            print(f"  - {os.path.basename(file_path)}: {error}")
+    
+    return output_dir
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -225,9 +302,17 @@ Usage examples:
     
     try:
         if os.path.isdir(args.input_path):
-            raise NotImplementedError(
-                "Batch processing of directories is not implemented yet. Please provide a single file for now. See parse.py"
+            result_dir = parse_folder(
+                args.input_path,
+                args.output,
+                MonkeyOCR_model,
+                args.task
             )
+            
+            if args.task:
+                print(f"\n✅ Folder processing with single task ({args.task}) recognition completed! Results saved in: {result_dir}")
+            else:
+                print(f"\n✅ Folder processing completed! Results saved in: {result_dir}")
         elif os.path.isfile(args.input_path):
             print("Loading model...")
 
