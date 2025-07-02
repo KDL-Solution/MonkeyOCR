@@ -20,9 +20,9 @@ chat_config:
       model_name: gpt-4.1
       api_key: sk-xxx
     lmdeploy:
-      weight_path: model_weight/Recognition
+      weight_path: Recognition
     vllm:
-      weight_path: model_weight/Recognition
+      weight_path: Recognition
     transformers:
-      weight_path: model_weight/Recognition
+      weight_path: Recognition
       batch_size: 10
