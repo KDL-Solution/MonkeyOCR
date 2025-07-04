@@ -13,7 +13,10 @@ from loguru import logger
 from magic_pdf.config.enums import SupportedPdfParseMethod
 from magic_pdf.config.ocr_content_type import BlockType, ContentType
 from magic_pdf.data.dataset import Dataset, PageableData
-from magic_pdf.libs.boxbase import calculate_overlap_area_in_bbox1_area_ratio, __is_overlaps_y_exceeds_threshold
+from magic_pdf.libs.boxbase import (
+    calculate_overlap_area_in_bbox1_area_ratio,
+    __is_overlaps_y_exceeds_threshold,
+)
 from magic_pdf.libs.clean_memory import clean_memory
 from magic_pdf.libs.convert_utils import dict_to_list
 from magic_pdf.libs.hash_utils import compute_md5
@@ -26,8 +29,12 @@ from magic_pdf.pre_proc.construct_page_dict import ocr_construct_page_component_
 from magic_pdf.pre_proc.cut_image import ocr_cut_image_and_table
 from magic_pdf.pre_proc.ocr_detect_all_bboxes import ocr_prepare_bboxes_for_layout_split_v2
 from magic_pdf.pre_proc.ocr_dict_merge import fill_spans_in_blocks, fix_block_spans_v2, fix_discarded_block
-from magic_pdf.pre_proc.ocr_span_list_modify import get_qa_need_list_v2, remove_overlaps_low_confidence_spans, \
-    remove_overlaps_min_spans, check_chars_is_overlap_in_span
+from magic_pdf.pre_proc.ocr_span_list_modify import (
+    get_qa_need_list_v2,
+    remove_overlaps_low_confidence_spans,
+    remove_overlaps_min_spans,
+    check_chars_is_overlap_in_span,
+)
 
 
 def __replace_STX_ETX(text_str: str):
@@ -708,13 +715,16 @@ def parse_page_core(
 
     spans = magic_model.get_all_spans(page_id)
 
-    spans = remove_outside_spans(spans, all_bboxes, all_discarded_blocks)
+    spans = remove_outside_spans(
+        spans,
+        all_bboxes,
+        all_discarded_blocks,
+    )  # 품어지는 요소는 여기서 제거됨!
 
     spans, dropped_spans_by_confidence = remove_overlaps_low_confidence_spans(spans)
     spans, dropped_spans_by_span_overlap = remove_overlaps_min_spans(spans)
 
     if parse_mode == SupportedPdfParseMethod.TXT:
-
         spans = txt_spans_extract_v2(page_doc, spans, all_bboxes, all_discarded_blocks, lang)
 
     elif parse_mode == SupportedPdfParseMethod.OCR:
@@ -786,7 +796,7 @@ def parse_page_core(
 
 
 def pdf_parse_union(
-    model_list,
+    model_list: List,
     dataset: Dataset,
     imageWriter,
     parse_mode,
@@ -796,12 +806,14 @@ def pdf_parse_union(
     debug_mode=False,
     lang=None,
 ):
-
     pdf_bytes_md5 = compute_md5(dataset.data_bits())
 
     pdf_info_dict = {}
 
-    magic_model = MagicModel(model_list, dataset)
+    magic_model = MagicModel(
+        model_list,
+        dataset,
+    )
 
     # end_page_id = end_page_id if end_page_id else len(pdf_docs) - 1
     end_page_id = (
@@ -845,11 +857,4 @@ def pdf_parse_union(
     }
 
     clean_memory(monkeyocr.device)
-
     return new_pdf_info_dict
-
-
-if __name__ == '__main__':
-    pass
-if __name__ == '__main__':
-    pass

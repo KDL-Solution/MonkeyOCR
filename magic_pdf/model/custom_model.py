@@ -283,7 +283,7 @@ class MonkeyChatvLLMAPI:
         except Exception as e:
             logger.error(f"Error processing single inference: {e}")
             return f"Error: {str(e)}"
-    
+
     def batch_inference(
         self,
         images: List[Image.Image],

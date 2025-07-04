@@ -23,8 +23,10 @@ def __is_hyphen_at_line_end(line):
     return bool(re.search(r'[A-Za-z]+-\s*$', line))
 
 
-def ocr_mk_mm_markdown_with_para_and_pagination(pdf_info_dict: list,
-                                                img_buket_path):
+def ocr_mk_mm_markdown_with_para_and_pagination(
+    pdf_info_dict: list,
+    img_buket_path,
+):
     markdown_with_para_and_pagination = []
     page_no = 0
     for page_info in pdf_info_dict:
@@ -238,7 +240,6 @@ def para_to_standard_format_v2(para_block, img_buket_path, page_idx, drop_reason
 
     if drop_reason is not None:
         para_content['drop_reason'] = drop_reason
-
     return para_content
 
 

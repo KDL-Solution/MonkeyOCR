@@ -305,7 +305,10 @@ class ImageDataset(Dataset):
 class Doc(PageableData):
     """Initialized with pymudoc object."""
 
-    def __init__(self, doc: fitz.Page):
+    def __init__(
+        self,
+        doc: fitz.Page,
+    ):
         self._doc = doc
 
     def get_image(self) -> dict:

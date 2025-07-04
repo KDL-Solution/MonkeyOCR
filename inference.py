@@ -165,7 +165,7 @@ def parse_file(
     # Start inference
     print("Performing document parsing...")
     start_time = time.time()
-    
+
     infer_result: InferenceResultLLM = dataset.apply(
         doc_analyze_llm,
         monkeyocr=monkeyocr,
@@ -191,7 +191,7 @@ def parse_file(
         f"{name_without_suff}.md",
         image_dir,
     )
-    
+
     pipe_result.dump_content_list(
         writer=md_writer,
         file_path=f"{name_without_suff}_content_list.json",

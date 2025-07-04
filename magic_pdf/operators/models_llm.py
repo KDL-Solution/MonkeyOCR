@@ -1,7 +1,7 @@
 import copy
 import json
 import os
-from typing import Callable
+from typing import Callable, List
 
 from magic_pdf.config.constants import PARSE_TYPE_OCR
 from magic_pdf.config.enums import SupportedPdfParseMethod
@@ -16,7 +16,11 @@ from magic_pdf.model.custom_model import MonkeyOCR
 
 
 class InferenceResultLLM(InferenceResultBase):
-    def __init__(self, inference_results: list, dataset: Dataset):
+    def __init__(
+        self,
+        inference_results: List,
+        dataset: Dataset,
+    ):
         """Initialized method.
 
         Args:
@@ -112,7 +116,7 @@ class InferenceResultLLM(InferenceResultBase):
                 dataset=self._dataset,
             )
 
-        res = self.apply(
+        return self.apply(
             proc,
             self._dataset,
             imageWriter,
@@ -123,4 +127,3 @@ class InferenceResultLLM(InferenceResultBase):
             lang=lang,
             monkeyocr=monkeyocr
         )
-        return res

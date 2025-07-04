@@ -1,10 +1,13 @@
+from typing import Tuple, List
 
 from magic_pdf.config.drop_tag import DropTag
 from magic_pdf.config.ocr_content_type import BlockType
 from magic_pdf.libs.boxbase import calculate_iou, get_minbox_if_overlap_by_ratio
 
 
-def remove_overlaps_low_confidence_spans(spans):
+def remove_overlaps_low_confidence_spans(
+    spans: List,
+) -> Tuple[List, List]:
     dropped_spans = []
 
     for span1 in spans:
@@ -29,7 +32,6 @@ def remove_overlaps_low_confidence_spans(spans):
         for span_need_remove in dropped_spans:
             spans.remove(span_need_remove)
             span_need_remove['tag'] = DropTag.SPAN_OVERLAP
-
     return spans, dropped_spans
 
 

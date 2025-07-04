@@ -1,4 +1,5 @@
 import enum
+from typing import List
 
 from magic_pdf.config.model_block_type import ModelBlockTypeEnum
 from magic_pdf.config.ocr_content_type import CategoryId, ContentType
@@ -21,8 +22,11 @@ class PosRelationEnum(enum.Enum):
 
 
 class MagicModel:
-
-    def __init__(self, model_list: list, docs: Dataset):
+    def __init__(
+        self,
+        model_list: List,
+        docs: Dataset,
+    ):
         self.__model_list = model_list
         self.__docs = docs
         self.__fix_axis()

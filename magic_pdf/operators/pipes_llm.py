@@ -47,6 +47,8 @@ class PipeResultLLM:
             str: return markdown content
         """
         pdf_info_list = self._pipe_res['pdf_info']
+        # print("get_markdown")
+        # print(len(pdf_info_list))
         md_content = union_make(
             pdf_info_list,
             make_mode=md_make_mode,
@@ -93,7 +95,8 @@ class PipeResultLLM:
             str: content list content
         """
         pdf_info_list = self._pipe_res['pdf_info']
-        # print(pdf_info_list)
+        # print("get_content_list")
+        # print(len(pdf_info_list))
         content_list = union_make(
             pdf_info_list,
             make_mode=MakeMode.STANDARD_FORMAT,
