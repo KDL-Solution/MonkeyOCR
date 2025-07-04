@@ -19,8 +19,7 @@ from magic_pdf.libs.convert_utils import dict_to_list
 from magic_pdf.libs.hash_utils import compute_md5
 from magic_pdf.libs.pdf_image_tools import cut_image_to_pil_image
 from magic_pdf.model.magic_model import MagicModel
-
-
+from magic_pdf.model.custom_model import MonkeyOCR
 from magic_pdf.model.sub_modules.model_init import AtomModelSingleton
 from magic_pdf.post_proc.para_split_v3 import para_split
 from magic_pdf.pre_proc.construct_page_dict import ocr_construct_page_component_v2
@@ -791,7 +790,7 @@ def pdf_parse_union(
     dataset: Dataset,
     imageWriter,
     parse_mode,
-    MonkeyOCR_model,
+    monkeyocr: MonkeyOCR,
     start_page_id=0,
     end_page_id=None,
     debug_mode=False,
@@ -827,7 +826,7 @@ def pdf_parse_union(
 
         if start_page_id <= page_id <= end_page_id:
             page_info = parse_page_core(
-                page, magic_model, page_id, pdf_bytes_md5, imageWriter, parse_mode, lang, MonkeyOCR_model
+                page, magic_model, page_id, pdf_bytes_md5, imageWriter, parse_mode, lang, monkeyocr
             )
         else:
             page_info = page.get_page_info()
@@ -845,7 +844,7 @@ def pdf_parse_union(
         'pdf_info': pdf_info_list,
     }
 
-    clean_memory(MonkeyOCR_model.device)
+    clean_memory(monkeyocr.device)
 
     return new_pdf_info_dict
 

@@ -7,7 +7,7 @@ import sys
 import logging
 from pathlib import Path
 import torch.distributed as dist
-from pdf2image import convert_from_path
+# from pdf2image import convert_from_path
 
 from magic_pdf.config.chat_content_type import TaskInstructions, LoraInstructions
 from magic_pdf.data.data_reader_writer import FileBasedDataWriter, FileBasedDataReader
@@ -15,15 +15,22 @@ from magic_pdf.data.dataset import PymuDocDataset, ImageDataset
 from magic_pdf.model.doc_analyze_by_custom_model_llm import doc_analyze_llm
 from magic_pdf.model.custom_model import MonkeyOCR
 from magic_pdf.operators.models_llm import InferenceResultLLM
+from magic_pdf.operators.models_llm import PipeResultLLM
 
-def single_task_recognition(input_file, output_dir, MonkeyOCR_model, task):
+
+def single_task_recognition(
+    input_file,
+    output_dir,
+    monkeyocr: MonkeyOCR,
+    task,
+):
     """
     Single task recognition for specific content type
     
     Args:
         input_file: Input file path
         output_dir: Output directory
-        MonkeyOCR_model: Pre-initialized model instance
+        monkeyocr: Pre-initialized model instance
         task: Task type ('text', 'formula', 'table')
     """
     print(f"Starting single task recognition: {task}")
@@ -66,13 +73,16 @@ def single_task_recognition(input_file, output_dir, MonkeyOCR_model, task):
     try:
         # Prepare instructions for all images
         instructions = [instruction] * len(images)
-        
+
         # Use chat model for single task recognition with PIL images directly
-        responses = MonkeyOCR_model.chat_model.batch_inference(images, instructions)
-        
+        responses = monkeyocr.chat_model.batch_inference(
+            images,
+            instructions,
+        )
+
         recognition_time = time.time() - start_time
         print(f"Recognition time: {recognition_time:.2f}s")
-        
+
         # Combine results
         combined_result = responses[0]
         for i, response in enumerate(responses):
@@ -81,13 +91,16 @@ def single_task_recognition(input_file, output_dir, MonkeyOCR_model, task):
         
         # Save result
         result_filename = f"{name_without_suff}_{task}_result.md"
-        md_writer.write(result_filename, combined_result.encode('utf-8'))
-        
+        md_writer.write(
+            result_filename,
+            combined_result.encode('utf-8'),
+        )
+
         print(f"Single task recognition completed!")
         print(f"Task: {task}")
         print(f"Processed {len(images)} image(s)")
         print(f"Result saved to: {os.path.join(local_md_dir, result_filename)}")
-        
+
         # Clean up resources
         try:
             # Give some time for async tasks to complete
@@ -106,14 +119,19 @@ def single_task_recognition(input_file, output_dir, MonkeyOCR_model, task):
     except Exception as e:
         raise RuntimeError(f"Single task recognition failed: {str(e)}")
 
-def parse_file(input_file, output_dir, MonkeyOCR_model):
+
+def parse_file(
+    input_file,
+    output_dir,
+    monkeyocr: MonkeyOCR,
+):
     """
     Parse file and save results
     
     Args:
         input_file: Input PDF file path
         output_dir: Output directory
-        MonkeyOCR_model: Pre-initialized model instance
+        monkeyocr: Pre-initialized model instance
     """
     print(f"Starting to parse file: {input_file}")
     
@@ -130,55 +148,70 @@ def parse_file(input_file, output_dir, MonkeyOCR_model):
     image_dir = os.path.basename(local_image_dir)
     os.makedirs(local_image_dir, exist_ok=True)
     os.makedirs(local_md_dir, exist_ok=True)
-    
+
     print(f"Output dir: {local_md_dir}")
     image_writer = FileBasedDataWriter(local_image_dir)
     md_writer = FileBasedDataWriter(local_md_dir)
     reader = FileBasedDataReader()
     file_bytes = reader.read(input_file)
-    
+
     # Create dataset instance
     file_extension = input_file.split(".")[-1].lower()
     if file_extension == "pdf":
-        ds = PymuDocDataset(file_bytes)
+        dataset = PymuDocDataset(file_bytes)
     else:
-        ds = ImageDataset(file_bytes)
-        
+        dataset = ImageDataset(file_bytes)
+
     # Start inference
     print("Performing document parsing...")
     start_time = time.time()
     
-    infer_result: InferenceResultLLM = ds.apply(doc_analyze_llm, MonkeyOCR_model=MonkeyOCR_model)
+    infer_result: InferenceResultLLM = dataset.apply(
+        doc_analyze_llm,
+        monkeyocr=monkeyocr,
+    )  # DocTags -> HTML.
     # Pipeline processing
-    pipe_result = infer_result.pipe_ocr_mode(image_writer, MonkeyOCR_model=MonkeyOCR_model)
-    
+    pipe_result: PipeResultLLM = infer_result.pipe_ocr_mode(
+        image_writer,
+        monkeyocr=monkeyocr,
+    )
+
     parsing_time = time.time() - start_time
     print(f"Parsing time: {parsing_time:.2f}s")
 
-    infer_result.draw_model(os.path.join(local_md_dir, f"{name_without_suff}_model.pdf"))
-    
+    infer_result.draw_model(
+        os.path.join(local_md_dir, f"{name_without_suff}_model.pdf"),
+    )
     pipe_result.draw_layout(os.path.join(local_md_dir, f"{name_without_suff}_layout.pdf"))
 
     pipe_result.draw_span(os.path.join(local_md_dir, f"{name_without_suff}_spans.pdf"))
 
+    pipe_result.dump_md(
+        md_writer,
+        f"{name_without_suff}.md",
+        image_dir,
+    )
     
-    pipe_result.dump_md(md_writer, f"{name_without_suff}.md", image_dir)
-    
-    pipe_result.dump_content_list(md_writer, f"{name_without_suff}_content_list.json", image_dir)
+    pipe_result.dump_content_list(
+        writer=md_writer,
+        file_path=f"{name_without_suff}_content_list.json",
+        image_dir_or_bucket_prefix=image_dir,
+    )
 
     pipe_result.dump_middle_json(md_writer, f'{name_without_suff}_middle.json')
-    
+
     print("Results saved to ", local_md_dir)
     return local_md_dir
 
-def parse_folder(folder_path, output_dir, MonkeyOCR_model, task=None):
+
+def parse_folder(folder_path, output_dir, monkeyocr, task=None):
     """
     Parse all PDF and image files in a folder
     
     Args:
         folder_path: Input folder path
         output_dir: Output directory
-        MonkeyOCR_model: Pre-initialized model instance
+        monkeyocr: Pre-initialized model instance
         task: Optional task type for single task recognition
     """
     print(f"Starting to parse folder: {folder_path}")
@@ -222,9 +255,9 @@ def parse_folder(folder_path, output_dir, MonkeyOCR_model, task=None):
         
         try:
             if task:
-                result_dir = single_task_recognition(file_path, output_dir, MonkeyOCR_model, task)
+                result_dir = single_task_recognition(file_path, output_dir, monkeyocr, task)
             else:
-                result_dir = parse_file(file_path, output_dir, MonkeyOCR_model)
+                result_dir = parse_file(file_path, output_dir, monkeyocr)
             
             successful_files.append(file_path)
             print(f"✅ Successfully processed: {os.path.basename(file_path)}")
@@ -290,22 +323,22 @@ Usage examples:
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         help="Set the logging level (default: INFO)"
     )
-    
+
     args = parser.parse_args()
-    
+
     logging.basicConfig(
         level=args.log_level,
         format='%(asctime)s - %(levelname)s - %(message)s',
         handlers=[logging.StreamHandler(sys.stdout)]
     )
-    MonkeyOCR_model = MonkeyOCR(args.config)
-    
+    monkeyocr = MonkeyOCR(args.config)
+
     try:
         if os.path.isdir(args.input_path):
             result_dir = parse_folder(
                 args.input_path,
                 args.output,
-                MonkeyOCR_model,
+                monkeyocr,
                 args.task
             )
             
@@ -313,6 +346,7 @@ Usage examples:
                 print(f"\n✅ Folder processing with single task ({args.task}) recognition completed! Results saved in: {result_dir}")
             else:
                 print(f"\n✅ Folder processing completed! Results saved in: {result_dir}")
+
         elif os.path.isfile(args.input_path):
             print("Loading model...")
 
@@ -320,7 +354,7 @@ Usage examples:
                 result_dir = single_task_recognition(
                     args.input_path,
                     args.output,
-                    MonkeyOCR_model,
+                    monkeyocr,
                     args.task
                 )
                 print(f"\n✅ Single task ({args.task}) recognition completed! Results saved in: {result_dir}")
@@ -328,7 +362,7 @@ Usage examples:
                 result_dir = parse_file(
                     args.input_path,
                     args.output,
-                    MonkeyOCR_model
+                    monkeyocr,
                 )
                 print(f"\n✅ Parsing completed! Results saved in: {result_dir}")
         else:
@@ -340,10 +374,10 @@ Usage examples:
     finally:
         # Clean up resources
         try:
-            if MonkeyOCR_model is not None:
+            if monkeyocr is not None:
                 # Clean up model resources if needed
-                if hasattr(MonkeyOCR_model, 'chat_model') and hasattr(MonkeyOCR_model.chat_model, 'close'):
-                    MonkeyOCR_model.chat_model.close()
+                if hasattr(monkeyocr, 'chat_model') and hasattr(monkeyocr.chat_model, 'close'):
+                    monkeyocr.chat_model.close()
                     
             # Give time for async tasks to complete before exiting
             time.sleep(1.0)

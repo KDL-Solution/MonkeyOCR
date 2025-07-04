@@ -1,6 +1,6 @@
 import re
-
 from loguru import logger
+from typing import Callable, List, Dict, Union, Any
 
 from magic_pdf.config.make_content_config import DropMode, MakeMode
 from magic_pdf.config.ocr_content_type import BlockType, ContentType
@@ -38,8 +38,9 @@ def ocr_mk_mm_markdown_with_para_and_pagination(pdf_info_dict: list,
             })
             page_no += 1
             continue
-        page_markdown = ocr_mk_markdown_with_para_core_v2(
-            paras_of_layout, 'mm', img_buket_path)
+        page_markdown: List[str] = ocr_mk_markdown_with_para_core_v2(
+            paras_of_layout, 'mm', img_buket_path,
+        )
         markdown_with_para_and_pagination.append({
             'page_no':
                 page_no,
@@ -50,10 +51,11 @@ def ocr_mk_mm_markdown_with_para_and_pagination(pdf_info_dict: list,
     return markdown_with_para_and_pagination
 
 
-def ocr_mk_markdown_with_para_core_v2(paras_of_layout,
-                                      mode,
-                                      img_buket_path='',
-                                      ):
+def ocr_mk_markdown_with_para_core_v2(
+    paras_of_layout,
+    mode,
+    img_buket_path='',
+) -> List[str]:
     page_markdown = []
     for para_block in paras_of_layout:
         para_text = ''
@@ -109,7 +111,6 @@ def ocr_mk_markdown_with_para_core_v2(paras_of_layout,
             continue
         else:
             page_markdown.append(para_text.strip() + '  ')
-
     return page_markdown
 
 
@@ -241,11 +242,12 @@ def para_to_standard_format_v2(para_block, img_buket_path, page_idx, drop_reason
     return para_content
 
 
-def union_make(pdf_info_dict: list,
-               make_mode: str,
-               drop_mode: str,
-               img_buket_path: str = '',
-               ):
+def union_make(
+    pdf_info_dict: List[Dict[str, Any]],
+    make_mode: str,
+    drop_mode: str,
+    img_buket_path: str = '',
+) -> Union[str, List[Dict[str, Any]]]:
     output_content = []
     for page_info in pdf_info_dict:
         drop_reason_flag = False
@@ -271,21 +273,28 @@ def union_make(pdf_info_dict: list,
         if not paras_of_layout:
             continue
         if make_mode == MakeMode.MM_MD:
-            page_markdown = ocr_mk_markdown_with_para_core_v2(
-                paras_of_layout, 'mm', img_buket_path)
+            page_markdown: List[str] = ocr_mk_markdown_with_para_core_v2(
+                paras_of_layout,
+                mode='mm',
+                img_buket_path=img_buket_path,
+            )
             output_content.extend(page_markdown)
         elif make_mode == MakeMode.NLP_MD:
-            page_markdown = ocr_mk_markdown_with_para_core_v2(
-                paras_of_layout, 'nlp')
+            page_markdown: List[str] = ocr_mk_markdown_with_para_core_v2(
+                paras_of_layout,
+                mode='nlp',
+            )
             output_content.extend(page_markdown)
         elif make_mode == MakeMode.STANDARD_FORMAT:
             for para_block in paras_of_layout:
                 if drop_reason_flag:
-                    para_content = para_to_standard_format_v2(
-                        para_block, img_buket_path, page_idx)
+                    para_content: Dict[str, Any] = para_to_standard_format_v2(
+                        para_block, img_buket_path, page_idx,
+                    )
                 else:
-                    para_content = para_to_standard_format_v2(
-                        para_block, img_buket_path, page_idx)
+                    para_content: Dict[str, Any] = para_to_standard_format_v2(
+                        para_block, img_buket_path, page_idx,
+                    )
                 output_content.append(para_content)
     if make_mode in [MakeMode.MM_MD, MakeMode.NLP_MD]:
         return '\n\n'.join(output_content)

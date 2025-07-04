@@ -19,30 +19,39 @@ from magic_pdf.model.sub_modules.model_utils import (
 from docling_core.types.doc.document import DocTagsDocument, DoclingDocument
 YOLO_LAYOUT_BASE_BATCH_SIZE = 1
 
-    
+
 def sanitize_md(output):
         cleaned = re.match(r'<md>.*</md>', output, flags=re.DOTALL)
         if cleaned is None:
             return output.replace('<md>', '').replace('</md>', '').replace('md\n','').strip()
         return f"{cleaned[0].replace('<md>', '').replace('</md>', '').strip()}"
+
+
 def sanitize_mf(output):
     cleaned = re.match(r'\$\$.*\$\$', output, flags=re.DOTALL)
     if cleaned is None:
         return output.replace('$$', '').strip()
     return f"{cleaned[0].replace('$$', '').strip()}"
+
+
 def sanitize_html(output):
     otsl_match = re.search(r'<otsl>.*?</otsl>', output, flags=re.DOTALL)
     if otsl_match:
         try:
             otsl_text = otsl_match.group(0)
             stream = StringIO(otsl_text)
-            table_tag = DocTagsDocument.from_doctags_and_image_pairs(stream, images=None)
+            table_tag = DocTagsDocument.from_doctags_and_image_pairs(
+                stream,
+                images=None,
+            )
             doc = DoclingDocument.load_from_doctags(table_tag)
             table_html = []
             for table in doc.tables:
                 table_html.append(table.export_to_html(doc=doc))
+
             if len(table_html) == 0:
                 return otsl_text.replace('<otsl>', '').replace('</otsl>', '').strip()
+
             # If there are tables, return the first table's HTML
             table_html = '\n'.join(table_html)
             return table_html.replace('<otsl>', '').replace('</otsl>', '').strip()
@@ -53,6 +62,7 @@ def sanitize_html(output):
     if cleaned is None:
         return '<html>\n'+output.replace('```html','<html>').replace('```','</html>').strip()+'\n</html>'
     return f"{cleaned[0].replace('```html','<html>').replace('```','</html>').strip()}"
+
 
 class LLMConfig:
     CATEGORY_MAPPING = {
@@ -148,9 +158,7 @@ class LLMConfig:
         """CategoryId에 해당하는 LoRA가 지원되는지 확인"""
         return cls.get_lora_type(category_id) != LoraType.BASE and cls.is_supported(category_id)
 
-    
-    
-    
+
 class BatchAnalyzeLLM:
     def __init__(self, model, backend='lmdeploy'):
         self.model = model
@@ -250,8 +258,7 @@ class BatchAnalyzeLLM:
         )
         return images_layout_res
 
-    def batch_llm_ocr(self, images, cat_ids,max_batch_size=8):
-
+    def batch_llm_ocr(self, images, cat_ids, max_batch_size=8):
         assert len(images) == len(cat_ids)
                     
         new_images = []
@@ -273,6 +280,7 @@ class BatchAnalyzeLLM:
                 if not LLMConfig.is_supported(cat_ids[i]):
                     ignore_idx.append(i)
                     continue
+
                 new_images.append(images[i])
                 if LLMConfig.is_lora_supported(cat_ids[i]):
                     messages.append(LLMConfig.get_instruction(cat_ids[i], version='lora'))

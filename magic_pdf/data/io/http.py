@@ -1,13 +1,10 @@
-
 import io
-
 import requests
 
 from magic_pdf.data.io.base import IOReader, IOWriter
 
 
 class HttpReader(IOReader):
-
     def read(self, url: str) -> bytes:
         """Read the file.
 

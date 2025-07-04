@@ -1,7 +1,12 @@
 import fitz
+from typing import List
+
 from magic_pdf.config.constants import CROSS_PAGE
-from magic_pdf.config.ocr_content_type import (BlockType, CategoryId,
-                                               ContentType)
+from magic_pdf.config.ocr_content_type import (
+    BlockType,
+    CategoryId,
+    ContentType,
+)
 from magic_pdf.data.dataset import Dataset
 from magic_pdf.model.magic_model import MagicModel
 
@@ -35,7 +40,15 @@ def draw_bbox_without_number(i, bbox_list, page, rgb_config, fill_config):
             )  # Draw the rectangle
 
 
-def draw_bbox_with_number(i, bbox_list, page, rgb_config, fill_config, draw_bbox=True):
+def draw_bbox_with_number(
+    i,
+    bbox_list,
+    page: fitz.Page,
+    type: str,
+    rgb_config: List[int],
+    fill_config: bool,
+    draw_bbox: bool = True,
+):
     new_rgb = []
     for item in rgb_config:
         item = float(item) / 255
@@ -64,11 +77,19 @@ def draw_bbox_with_number(i, bbox_list, page, rgb_config, fill_config, draw_bbox
                     overlay=True,
                 )  # Draw the rectangle
         page.insert_text(
-            (x1 + 2, y0 + 10), str(j + 1), fontsize=10, color=new_rgb
+            (x1 - 60, y0),
+            f"{type}: {j + 1}",
+            fontsize=10,
+            color=new_rgb,
         )  # Insert the index in the top left corner of the rectangle
 
 
-def draw_layout_bbox(pdf_info, pdf_bytes, out_path, filename):
+def draw_layout_bbox(
+    pdf_info,
+    pdf_bytes,
+    out_path,
+    filename,
+):
     dropped_bbox_list = []
     tables_list, tables_body_list = [], []
     tables_caption_list, tables_footnote_list = [], []
@@ -174,7 +195,6 @@ def draw_layout_bbox(pdf_info, pdf_bytes, out_path, filename):
     pdf_docs = fitz.open('pdf', pdf_bytes)
 
     for i, page in enumerate(pdf_docs):
-
         draw_bbox_without_number(i, dropped_bbox_list, page, [158, 158, 158], True)
         # draw_bbox_without_number(i, tables_list, page, [153, 153, 0], True)  # color !
         draw_bbox_without_number(i, tables_body_list, page, [204, 204, 0], True)
@@ -191,7 +211,13 @@ def draw_layout_bbox(pdf_info, pdf_bytes, out_path, filename):
         draw_bbox_without_number(i, indexs_list, page, [40, 169, 92], True)
 
         draw_bbox_with_number(
-            i, layout_bbox_list, page, [255, 0, 0], False, draw_bbox=False
+            i,
+            layout_bbox_list,
+            page,
+            "layout_bbox_list",
+            [255, 0, 0],
+            False,
+            draw_bbox=False,
         )
 
     # Save the PDF
@@ -286,7 +312,12 @@ def draw_span_bbox(pdf_info, pdf_bytes, out_path, filename):
     pdf_docs.save(f'{out_path}/{filename}')
 
 
-def draw_model_bbox(model_list, dataset: Dataset, out_path, filename):
+def draw_model_bbox(
+    model_list,
+    dataset: Dataset,
+    out_path,
+    filename,
+):
     dropped_bbox_list = []
     tables_body_list, tables_caption_list, tables_footnote_list = [], [], []
     imgs_body_list, imgs_caption_list, imgs_footnote_list = [], [], []
@@ -339,18 +370,87 @@ def draw_model_bbox(model_list, dataset: Dataset, out_path, filename):
 
     for i in range(len(dataset)):
         page = dataset.get_page(i)
+
         draw_bbox_with_number(
-            i, dropped_bbox_list, page, [158, 158, 158], True
-        )  # color !
-        draw_bbox_with_number(i, tables_body_list, page, [204, 204, 0], True)
-        draw_bbox_with_number(i, tables_caption_list, page, [255, 255, 102], True)
-        draw_bbox_with_number(i, tables_footnote_list, page, [229, 255, 204], True)
-        draw_bbox_with_number(i, imgs_body_list, page, [153, 255, 51], True)
-        draw_bbox_with_number(i, imgs_caption_list, page, [102, 178, 255], True)
-        draw_bbox_with_number(i, imgs_footnote_list, page, [255, 178, 102], True)
-        draw_bbox_with_number(i, titles_list, page, [102, 102, 255], True)
-        draw_bbox_with_number(i, texts_list, page, [153, 0, 76], True)
-        draw_bbox_with_number(i, interequations_list, page, [0, 255, 0], True)
+            i,
+            bbox_list=dropped_bbox_list,
+            page=page,
+            type="dropped_bbox_list",
+            rgb_config=[158, 158, 158],
+            fill_config=True,
+        )  # 회색.
+        draw_bbox_with_number(
+            i,
+            bbox_list=tables_body_list,
+            page=page,
+            type="tables_body_list",
+            rgb_config=[204, 204, 0],
+            fill_config=True,
+        )  # 노란색.
+        draw_bbox_with_number(
+            i,
+            tables_caption_list,
+            page,
+            "tables_caption_list",
+            [255, 255, 102],
+            True,
+        )
+        draw_bbox_with_number(
+            i,
+            tables_footnote_list,
+            page,
+            "tables_footnote_list",
+            [229, 255, 204],
+            True,
+        )
+        draw_bbox_with_number(
+            i,
+            imgs_body_list,
+            page,
+            "imgs_body_list",
+            [153, 255, 51],
+            True,
+        )
+        draw_bbox_with_number(
+            i,
+            imgs_caption_list,
+            page,
+            "imgs_caption_list",
+            [102, 178, 255],
+            True,
+        )
+        draw_bbox_with_number(
+            i,
+            imgs_footnote_list,
+            page,
+            "imgs_footnote_list",
+            [255, 178, 102],
+            True,
+        )
+        draw_bbox_with_number(
+            i,
+            titles_list,
+            page,
+            "titles_list",
+            [102, 102, 255],
+            True,
+        )  # 보라색.
+        draw_bbox_with_number(
+            i,
+            texts_list,
+            page,
+            "texts_list",
+            [153, 0, 76],
+            True,
+        )
+        draw_bbox_with_number(
+            i,
+            interequations_list,
+            page,
+            "interequations_list",
+            [0, 255, 0],
+            True,
+        )
 
     # Save the PDF
     dataset.dump_to_file(f'{out_path}/{filename}')
@@ -401,7 +501,14 @@ def draw_line_sort_bbox(pdf_info, pdf_bytes, out_path, filename):
         layout_bbox_list.append(sorted_bbox['bbox'] for sorted_bbox in sorted_bboxes)
     pdf_docs = fitz.open('pdf', pdf_bytes)
     for i, page in enumerate(pdf_docs):
-        draw_bbox_with_number(i, layout_bbox_list, page, [255, 0, 0], False)
+        draw_bbox_with_number(
+            i,
+            layout_bbox_list,
+            page,
+            "layout_bbox_list",
+            [255, 0, 0],
+            False,
+        )
 
     pdf_docs.save(f'{out_path}/{filename}')
 

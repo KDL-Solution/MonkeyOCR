@@ -9,3 +9,65 @@ table_tag = DocTagsDocument.from_doctags_and_image_pairs(stream, images=None)
 doc = DoclingDocument.load_from_doctags(table_tag)
 for item in doc.tables:
     print(item.export_to_html(doc=doc))
+
+import regex
+from io import BytesIO
+from docling.backend.html_backend import HTMLDocumentBackend
+from docling.datamodel.base_models import InputFormat
+from docling.datamodel.document import InputDocument
+
+
+class HTMLToDogTags:
+    def __init__(
+        self,
+    ):
+        self.backend_class = HTMLDocumentBackend
+        self.format = InputFormat.HTML
+        self.otsl_pattern = regex.compile(
+            r"<otsl>.*?</otsl>",
+            regex.DOTALL,
+        )
+
+    def extract_otsl(
+        self,
+        text: str,
+    ) -> str:
+        """Find the content <otsl>...</otsl>
+        """
+        if not isinstance(text, str):
+            return None
+        match = regex.search(
+            self.otsl_pattern,
+            text,
+        )
+        if match:
+            return match.group(0).strip()
+        else:
+            return None
+
+    def convert(
+        self,
+        html: str,
+    ) -> str:
+        html_bytes = html.encode("utf-8")
+        bytes_io = BytesIO(html_bytes)
+        in_doc = InputDocument(
+            path_or_stream=bytes_io,
+            format=self.format,
+            backend=self.backend_class,
+            filename="temp.html",
+        )
+        backend = self.backend_class(
+            in_doc=in_doc,
+            path_or_stream=bytes_io,
+        )
+        dl_document = backend.convert()
+        doctags = dl_document.export_to_doctags()
+        return self.extract_otsl(
+            doctags,
+        )
+converter = HTMLToDogTags()
+html = search_results.iloc[10].to_dict()["label"]
+converter.convert(
+    html,
+)

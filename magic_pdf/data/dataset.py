@@ -301,6 +301,7 @@ class ImageDataset(Dataset):
         """
         return ImageDataset(self._raw_data)
 
+
 class Doc(PageableData):
     """Initialized with pymudoc object."""
 

@@ -12,6 +12,8 @@ from magic_pdf.libs.version import __version__
 from magic_pdf.operators.pipes_llm import PipeResultLLM
 from magic_pdf.pdf_parse_union_core_v2_llm import pdf_parse_union
 from magic_pdf.operators import InferenceResultBase
+from magic_pdf.model.custom_model import MonkeyOCR
+
 
 class InferenceResultLLM(InferenceResultBase):
     def __init__(self, inference_results: list, dataset: Dataset):
@@ -24,7 +26,10 @@ class InferenceResultLLM(InferenceResultBase):
         self._infer_res = inference_results
         self._dataset = dataset
 
-    def draw_model(self, file_path: str) -> None:
+    def draw_model(
+        self,
+        file_path: str,
+    ) -> None:
         """Draw model inference result.
 
         Args:
@@ -34,8 +39,12 @@ class InferenceResultLLM(InferenceResultBase):
         base_name = os.path.basename(file_path)
         if not os.path.exists(dir_name):
             os.makedirs(dir_name, exist_ok=True)
+
         draw_model_bbox(
-            copy.deepcopy(self._infer_res), self._dataset, dir_name, base_name
+            model_list=copy.deepcopy(self._infer_res),
+            dataset=self._dataset,
+            out_path=dir_name,
+            filename=base_name,
         )
 
     def dump_model(self, writer: DataWriter, file_path: str):
@@ -72,7 +81,7 @@ class InferenceResultLLM(InferenceResultBase):
     def pipe_ocr_mode(
         self,
         imageWriter: DataWriter,
-        MonkeyOCR_model,
+        monkeyocr: MonkeyOCR,
         start_page_id=0,
         end_page_id=None,
         debug_mode=False,
@@ -98,7 +107,10 @@ class InferenceResultLLM(InferenceResultBase):
             res['_version_name'] = __version__
             if 'lang' in kwargs and kwargs['lang'] is not None:
                 res['lang'] = kwargs['lang']
-            return PipeResultLLM(res, self._dataset)
+            return PipeResultLLM(
+                res,
+                dataset=self._dataset,
+            )
 
         res = self.apply(
             proc,
@@ -109,6 +121,6 @@ class InferenceResultLLM(InferenceResultBase):
             end_page_id=end_page_id,
             debug_mode=debug_mode,
             lang=lang,
-            MonkeyOCR_model=MonkeyOCR_model
+            monkeyocr=monkeyocr
         )
         return res

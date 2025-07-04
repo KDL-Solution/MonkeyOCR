@@ -1,28 +1,30 @@
-import os
+# import os
 import time
-
 from loguru import logger
 
 from magic_pdf.model.batch_analyze_llm import BatchAnalyzeLLM
-
 from magic_pdf.data.dataset import Dataset
 from magic_pdf.libs.clean_memory import clean_memory
 from magic_pdf.operators.models_llm import InferenceResultLLM
-        
+from magic_pdf.model.custom_model import MonkeyOCR
+
 
 def doc_analyze_llm(
     dataset: Dataset,
-    MonkeyOCR_model,
+    monkeyocr: MonkeyOCR,
     start_page_id=0,
     end_page_id=None,
 ) -> InferenceResultLLM:
 
     end_page_id = end_page_id if end_page_id else len(dataset) - 1
 
-    device = MonkeyOCR_model.device
-    backend = MonkeyOCR_model.chat_backend
+    device = monkeyocr.device
+    backend = monkeyocr.chat_backend
 
-    batch_model = BatchAnalyzeLLM(model=MonkeyOCR_model, backend=backend)
+    batch_model = BatchAnalyzeLLM(
+        model=monkeyocr,
+        backend=backend,
+    )
 
     model_json = []
     doc_analyze_start = time.time()
@@ -60,5 +62,4 @@ def doc_analyze_llm(
         f'doc analyze time: {round(time.time() - doc_analyze_start, 2)},'
         f'speed: {doc_analyze_speed} pages/second'
     )
-
     return InferenceResultLLM(model_json, dataset)
