@@ -632,7 +632,7 @@ def ocr_construct_page_component_v2(
 
 
 def parse_page_core(
-    page_doc: PageableData, magic_model, page_id, pdf_bytes_md5, imageWriter, parse_mode, lang, MonkeyOCR_model
+    page_doc: PageableData, magic_model: MagicModel, page_id, pdf_bytes_md5, imageWriter, parse_mode, lang, MonkeyOCR_model
 ):
     need_drop = False
     drop_reason = []
