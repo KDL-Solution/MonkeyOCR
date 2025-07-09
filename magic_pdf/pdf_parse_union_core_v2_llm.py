@@ -674,7 +674,6 @@ def parse_page_core(
 
             return b1, b2
 
-
         y_overlapping_blocks = []
         title_bs = [b for b in blocks if b['type'] == BlockType.Title]
         while title_bs:
@@ -721,29 +720,43 @@ def parse_page_core(
         for b in to_remove_blocks:
             blocks.remove(b)
 
-    interline_equation_blocks = []
-    if len(interline_equation_blocks) > 0:
-        all_bboxes, all_discarded_blocks = ocr_prepare_bboxes_for_layout_split_v2(
-            img_body_blocks, img_caption_blocks, img_footnote_blocks,
-            table_body_blocks, table_caption_blocks, table_footnote_blocks,
-            discarded_blocks,
-            text_blocks,
-            title_blocks,
-            interline_equation_blocks,
-            page_w,
-            page_h,
-        )
-    else:
-        all_bboxes, all_discarded_blocks = ocr_prepare_bboxes_for_layout_split_v2(
-            img_body_blocks, img_caption_blocks, img_footnote_blocks,
-            table_body_blocks, table_caption_blocks, table_footnote_blocks,
-            discarded_blocks,
-            text_blocks,
-            title_blocks,
-            interline_equations,
-            page_w,
-            page_h,
-        )
+    # interline_equation_blocks = []
+    # if len(interline_equation_blocks) > 0:
+    #     all_bboxes, all_discarded_blocks = ocr_prepare_bboxes_for_layout_split_v2(
+    #         img_body_blocks, img_caption_blocks, img_footnote_blocks,
+    #         table_body_blocks, table_caption_blocks, table_footnote_blocks,
+    #         discarded_blocks,
+    #         text_blocks,
+    #         title_blocks,
+    #         interline_equation_blocks,
+    #         page_w,
+    #         page_h,
+    #     )
+    # else:
+        # all_bboxes, all_discarded_blocks = ocr_prepare_bboxes_for_layout_split_v2(
+        #     img_body_blocks, img_caption_blocks, img_footnote_blocks,
+        #     table_body_blocks, table_caption_blocks, table_footnote_blocks,
+        #     discarded_blocks,
+        #     text_blocks,
+        #     title_blocks,
+        #     interline_equations,
+        #     page_w,
+        #     page_h,
+        # )
+    all_bboxes, all_discarded_blocks = ocr_prepare_bboxes_for_layout_split_v2(
+        img_body_blocks,
+        img_caption_blocks,
+        img_footnote_blocks,
+        table_body_blocks,
+        table_caption_blocks,
+        table_footnote_blocks,
+        discarded_blocks,
+        text_blocks,
+        title_blocks,
+        interline_equations,
+        page_w,
+        page_h,
+    )
 
     spans = magic_model.get_all_spans(page_id)
 

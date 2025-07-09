@@ -82,6 +82,7 @@ def ocr_prepare_bboxes_for_layout_split_v2(
     add_bboxes(text_blocks, BlockType.Text, all_bboxes)
     add_bboxes(title_blocks, BlockType.Title, all_bboxes)
     add_bboxes(interline_equation_blocks, BlockType.InterlineEquation, all_bboxes)
+    print(all_bboxes)
 
     all_bboxes = fix_text_overlap_title_blocks(all_bboxes)
     all_bboxes = remove_need_drop_blocks(all_bboxes, discarded_blocks)

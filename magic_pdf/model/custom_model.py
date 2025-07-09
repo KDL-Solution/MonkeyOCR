@@ -63,7 +63,6 @@ class MonkeyOCR:
                 "Please run 'python download_model.py' to download the required models."
             )
 
-
         atom_model_manager = AtomModelSingleton()
         if self.layout_model_name == MODEL_NAME.DocLayout_YOLO:
             self.layout_model = atom_model_manager.get_atom_model(
@@ -73,7 +72,6 @@ class MonkeyOCR:
                 device=self.device,
             )
         logger.info(f'layout model loaded: {self.layout_model_name}')
-
 
         layout_reader_config = self.layout_config.get('reader')
         self.layout_reader_name = layout_reader_config.get('name')

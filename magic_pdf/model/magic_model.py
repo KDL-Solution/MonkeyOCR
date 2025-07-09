@@ -522,17 +522,17 @@ class MagicModel:
     # ) -> list:
     #     return self.get_tables_v2(page_no)
 
-    # def get_equations(self, page_no: int) -> list:
-    #     inline_equations = self.__get_blocks_by_type(
-    #         ModelBlockTypeEnum.EMBEDDING.value, page_no, ['latex']
-    #     )
-    #     interline_equations = self.__get_blocks_by_type(
-    #         ModelBlockTypeEnum.ISOLATED.value, page_no, ['latex']
-    #     )
-    #     interline_equations_blocks = self.__get_blocks_by_type(
-    #         ModelBlockTypeEnum.ISOLATE_FORMULA.value, page_no
-    #     )
-    #     return inline_equations, interline_equations, interline_equations_blocks
+    def get_equations(self, page_no: int) -> list:
+        inline_equations = self.__get_blocks_by_type(
+            ModelBlockTypeEnum.EMBEDDING.value, page_no, ['latex']
+        )
+        interline_equations = self.__get_blocks_by_type(
+            ModelBlockTypeEnum.ISOLATED.value, page_no, ['latex']
+        )
+        interline_equations_blocks = self.__get_blocks_by_type(
+            ModelBlockTypeEnum.ISOLATE_FORMULA.value, page_no
+        )
+        return inline_equations, interline_equations, interline_equations_blocks
 
     def get_discarded(self, page_no: int) -> list:
         blocks = self.__get_blocks_by_type(ModelBlockTypeEnum.ABANDON.value, page_no)
