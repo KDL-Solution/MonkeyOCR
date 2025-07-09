@@ -5,7 +5,7 @@ from magic_pdf.libs.boxbase import (
     calculate_vertical_projection_overlap_ratio,
     get_minbox_if_overlap_by_ratio
 )
-from magic_pdf.pre_proc.remove_bbox_overlap import remove_overlap_between_bbox_for_block
+# from magic_pdf.pre_proc.remove_bbox_overlap import remove_overlap_between_bbox_for_block
 
 
 def add_bboxes(blocks, block_type, bboxes):
@@ -211,8 +211,6 @@ def remove_need_drop_blocks(all_bboxes, discarded_blocks):
 
 
 def remove_overlaps_min_blocks(all_bboxes):
-
-
     need_remove = []
     for block1 in all_bboxes:
         for block2 in all_bboxes:

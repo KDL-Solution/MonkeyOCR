@@ -1,10 +1,10 @@
 import copy
 import math
-import os
+# import os
 import re
 import statistics
 import time
-from typing import List
+from typing import Dict, List, Any
 
 import fitz
 import torch
@@ -18,17 +18,21 @@ from magic_pdf.libs.boxbase import (
     __is_overlaps_y_exceeds_threshold,
 )
 from magic_pdf.libs.clean_memory import clean_memory
-from magic_pdf.libs.convert_utils import dict_to_list
+# from magic_pdf.libs.convert_utils import dict_to_list
 from magic_pdf.libs.hash_utils import compute_md5
 from magic_pdf.libs.pdf_image_tools import cut_image_to_pil_image
 from magic_pdf.model.magic_model import MagicModel
 from magic_pdf.model.custom_model import MonkeyOCR
 from magic_pdf.model.sub_modules.model_init import AtomModelSingleton
 from magic_pdf.post_proc.para_split_v3 import para_split
-from magic_pdf.pre_proc.construct_page_dict import ocr_construct_page_component_v2
+# from magic_pdf.pre_proc.construct_page_dict import ocr_construct_page_component_v2
 from magic_pdf.pre_proc.cut_image import ocr_cut_image_and_table
 from magic_pdf.pre_proc.ocr_detect_all_bboxes import ocr_prepare_bboxes_for_layout_split_v2
-from magic_pdf.pre_proc.ocr_dict_merge import fill_spans_in_blocks, fix_block_spans_v2, fix_discarded_block
+from magic_pdf.pre_proc.ocr_dict_merge import (
+    fill_spans_in_blocks,
+    fix_block_spans_v2,
+    fix_discarded_block,
+)
 from magic_pdf.pre_proc.ocr_span_list_modify import (
     get_qa_need_list_v2,
     remove_overlaps_low_confidence_spans,
@@ -37,21 +41,21 @@ from magic_pdf.pre_proc.ocr_span_list_modify import (
 )
 
 
-def __replace_STX_ETX(text_str: str):
-    """Replace \u0002 and \u0003, as these characters become garbled when extracted using pymupdf. In fact, they were originally quotation marks.
-    Drawback: This issue is only observed in English text; it has not been found in Chinese text so far.
+# def __replace_STX_ETX(text_str: str):
+#     """Replace \u0002 and \u0003, as these characters become garbled when extracted using pymupdf. In fact, they were originally quotation marks.
+#     Drawback: This issue is only observed in English text; it has not been found in Chinese text so far.
 
-        Args:
-            text_str (str): raw text
+#         Args:
+#             text_str (str): raw text
 
-        Returns:
-            _type_: replaced text
-    """  # noqa: E501
-    if text_str:
-        s = text_str.replace('\u0002', "'")
-        s = s.replace('\u0003', "'")
-        return s
-    return text_str
+#         Returns:
+#             _type_: replaced text
+#     """  # noqa: E501
+#     if text_str:
+#         s = text_str.replace('\u0002', "'")
+#         s = s.replace('\u0003', "'")
+#         return s
+#     return text_str
 
 
 def __replace_0xfffd(text_str: str):
@@ -107,7 +111,6 @@ LINE_START_FLAG = ('(', '（', '"', '“', '【', '{', '《', '<', '「', '『',
 
 
 def fill_char_in_spans(spans, all_chars):
-
     # Simple top-to-bottom sorting
     spans = sorted(spans, key=lambda x: x['bbox'][1])
 
@@ -595,8 +598,37 @@ def remove_outside_spans(spans, all_bboxes, all_discarded_blocks):
             if any(calculate_overlap_area_in_bbox1_area_ratio(span_bbox, block_bbox) > 0.5 for block_bbox in
                    other_block_bboxes):
                 new_spans.append(span)
-
     return new_spans
+
+
+def ocr_construct_page_component_v2(
+    blocks,
+    layout_bboxes,
+    page_id,
+    page_w,
+    page_h,
+    layout_tree,
+    images,
+    tables,
+    interline_equations,
+    discarded_blocks,
+    need_drop,
+    drop_reason,
+):
+    return_dict = {
+        'preproc_blocks': blocks,
+        'layout_bboxes': layout_bboxes,
+        'page_idx': page_id,
+        'page_size': [page_w, page_h],
+        '_layout_tree': layout_tree,
+        'images': images,
+        'tables': tables,
+        'interline_equations': interline_equations,
+        'discarded_blocks': discarded_blocks,
+        'need_drop': need_drop,
+        'drop_reason': drop_reason,
+    }
+    return return_dict
 
 
 def parse_page_core(
@@ -805,7 +837,7 @@ def pdf_parse_union(
     end_page_id=None,
     debug_mode=False,
     lang=None,
-):
+) -> Dict[str, List[Dict[str, Any]]]:
     pdf_bytes_md5 = compute_md5(dataset.data_bits())
 
     pdf_info_dict = {}
@@ -851,7 +883,8 @@ def pdf_parse_union(
 
     para_split(pdf_info_dict)
 
-    pdf_info_list = dict_to_list(pdf_info_dict)
+    # pdf_info_list = dict_to_list(pdf_info_dict)
+    pdf_info_list = list(pdf_info_dict.values())
     new_pdf_info_dict = {
         'pdf_info': pdf_info_list,
     }

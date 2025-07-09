@@ -1,4 +1,3 @@
-
 def ocr_construct_page_component_v2(blocks, layout_bboxes, page_id, page_w, page_h, layout_tree,
                                     images, tables, interline_equations, discarded_blocks, need_drop, drop_reason):
     return_dict = {

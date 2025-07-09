@@ -29,6 +29,7 @@ class PipeResultLLM:
         """
         self._pipe_res = pipe_res
         self._dataset = dataset
+        print(self._pipe_res)
 
     def get_markdown(
         self,
@@ -61,7 +62,7 @@ class PipeResultLLM:
         self,
         writer: DataWriter,
         file_path: str,
-        img_dir_or_bucket_prefix: str,
+        image_dir_or_bucket_prefix: str,
         drop_mode=DropMode.NONE,
         md_make_mode=MakeMode.MM_MD,
     ):
@@ -76,7 +77,9 @@ class PipeResultLLM:
         """
 
         md_content = self.get_markdown(
-            img_dir_or_bucket_prefix, drop_mode=drop_mode, md_make_mode=md_make_mode
+            image_dir_or_bucket_prefix,
+            drop_mode=drop_mode,
+            md_make_mode=md_make_mode,
         )
         writer.write_string(file_path, md_content)
 
@@ -95,8 +98,6 @@ class PipeResultLLM:
             str: content list content
         """
         pdf_info_list = self._pipe_res['pdf_info']
-        # print("get_content_list")
-        # print(len(pdf_info_list))
         content_list = union_make(
             pdf_info_list,
             make_mode=MakeMode.STANDARD_FORMAT,
@@ -124,7 +125,6 @@ class PipeResultLLM:
             image_dir_or_bucket_prefix,
             drop_mode=drop_mode,
         )
-        # print(content_list)
         writer.write_string(
             file_path,
             json.dumps(

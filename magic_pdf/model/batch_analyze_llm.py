@@ -17,6 +17,7 @@ from PIL import Image
 from magic_pdf.model.sub_modules.model_utils import (
     clean_vram, crop_img)
 from docling_core.types.doc.document import DocTagsDocument, DoclingDocument
+
 YOLO_LAYOUT_BASE_BATCH_SIZE = 1
 
 

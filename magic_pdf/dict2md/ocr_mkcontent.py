@@ -251,17 +251,21 @@ def union_make(
 ) -> Union[str, List[Dict[str, Any]]]:
     output_content = []
     for page_info in pdf_info_dict:
-        drop_reason_flag = False
+        # drop_reason_flag = False
         drop_reason = None
         if page_info.get('need_drop', False):
             drop_reason = page_info.get('drop_reason')
             if drop_mode == DropMode.NONE:
                 pass
-            elif drop_mode == DropMode.NONE_WITH_REASON:
-                drop_reason_flag = True
+            # elif drop_mode == DropMode.NONE_WITH_REASON:
+                # drop_reason_flag = True
             elif drop_mode == DropMode.WHOLE_PDF:
-                raise Exception((f'drop_mode is {DropMode.WHOLE_PDF} ,'
-                                 f'drop_reason is {drop_reason}'))
+                raise Exception(
+                    (
+                        f'drop_mode is {DropMode.WHOLE_PDF} ,'
+                        f'drop_reason is {drop_reason}'
+                    )
+                )
             elif drop_mode == DropMode.SINGLE_PAGE:
                 logger.warning((f'drop_mode is {DropMode.SINGLE_PAGE} ,'
                                 f'drop_reason is {drop_reason}'))
@@ -288,14 +292,23 @@ def union_make(
             output_content.extend(page_markdown)
         elif make_mode == MakeMode.STANDARD_FORMAT:
             for para_block in paras_of_layout:
-                if drop_reason_flag:
-                    para_content: Dict[str, Any] = para_to_standard_format_v2(
-                        para_block, img_buket_path, page_idx,
-                    )
-                else:
-                    para_content: Dict[str, Any] = para_to_standard_format_v2(
-                        para_block, img_buket_path, page_idx,
-                    )
+                para_content: Dict[str, Any] = para_to_standard_format_v2(
+                    para_block,
+                    img_buket_path,
+                    page_idx,
+                )
+                # if drop_reason_flag:
+                #     para_content: Dict[str, Any] = para_to_standard_format_v2(
+                #         para_block,
+                #         img_buket_path,
+                #         page_idx,
+                #     )
+                # else:
+                #     para_content: Dict[str, Any] = para_to_standard_format_v2(
+                #         para_block,
+                #         img_buket_path,
+                #         page_idx,
+                #     )
                 output_content.append(para_content)
     if make_mode in [MakeMode.MM_MD, MakeMode.NLP_MD]:
         return '\n\n'.join(output_content)

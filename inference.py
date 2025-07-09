@@ -5,12 +5,15 @@ import time
 import argparse
 import sys
 import logging
-from pathlib import Path
 import torch.distributed as dist
+# from pathlib import Path
 # from pdf2image import convert_from_path
 
-from magic_pdf.config.chat_content_type import TaskInstructions, LoraInstructions
-from magic_pdf.data.data_reader_writer import FileBasedDataWriter, FileBasedDataReader
+from magic_pdf.config.chat_content_type import TaskInstructions
+from magic_pdf.data.data_reader_writer import (
+    FileBasedDataWriter,
+    FileBasedDataReader,
+)
 from magic_pdf.data.dataset import PymuDocDataset, ImageDataset
 from magic_pdf.model.doc_analyze_by_custom_model_llm import doc_analyze_llm
 from magic_pdf.model.custom_model import MonkeyOCR
@@ -189,9 +192,8 @@ def parse_file(
     pipe_result.dump_md(
         md_writer,
         f"{name_without_suff}.md",
-        image_dir,
+        image_dir_or_bucket_prefix=image_dir,
     )
-
     pipe_result.dump_content_list(
         writer=md_writer,
         file_path=f"{name_without_suff}_content_list.json",
