@@ -104,9 +104,9 @@ def ocr_prepare_bboxes_for_layout_split_v2(
             all_bboxes.remove(block)
             all_discarded_blocks.append(block)
 
-    # all_bboxes = remove_overlaps_min_blocks(all_bboxes)
-    # all_discarded_blocks = remove_overlaps_min_blocks(all_discarded_blocks)
-    # all_bboxes, drop_reasons = remove_overlap_between_bbox_for_block(all_bboxes)
+    # all_bboxes = remove_overlaps_min_blocks(all_bboxes)  ### 표 안의 이미지 처리.
+
+    all_discarded_blocks = remove_overlaps_min_blocks(all_discarded_blocks)
     all_bboxes.sort(key=lambda x: x[0]+x[1])
     return all_bboxes, all_discarded_blocks
 

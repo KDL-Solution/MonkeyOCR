@@ -67,7 +67,6 @@ def remove_overlaps_min_spans(spans):
 
 
 def get_qa_need_list_v2(blocks):
-
     images = []
     tables = []
     interline_equations = []
