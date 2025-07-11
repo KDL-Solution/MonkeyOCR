@@ -29,7 +29,7 @@ class PipeResultLLM:
         """
         self._pipe_res = pipe_res
         self._dataset = dataset
-        print(self._pipe_res)
+        # print(self._pipe_res)
 
     def get_markdown(
         self,
@@ -48,8 +48,7 @@ class PipeResultLLM:
             str: return markdown content
         """
         pdf_info_list = self._pipe_res['pdf_info']
-        # print("get_markdown")
-        # print(len(pdf_info_list))
+        # print(pdf_info_list)
         md_content = union_make(
             pdf_info_list,
             make_mode=md_make_mode,

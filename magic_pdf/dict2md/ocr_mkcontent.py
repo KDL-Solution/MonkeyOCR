@@ -181,7 +181,12 @@ def merge_para_with_text(para_block):
     return para_text
 
 
-def para_to_standard_format_v2(para_block, img_buket_path, page_idx, drop_reason=None):
+def para_to_standard_format_v2(
+    para_block,
+    img_buket_path,
+    page_idx,
+    drop_reason=None,
+):
     para_type = para_block['type']
     para_content = {}
     if para_type in [BlockType.Text, BlockType.List, BlockType.Index]:
@@ -216,13 +221,18 @@ def para_to_standard_format_v2(para_block, img_buket_path, page_idx, drop_reason
             if block['type'] == BlockType.ImageFootnote:
                 para_content['img_footnote'].append(merge_para_with_text(block))
     elif para_type == BlockType.Table:
-        para_content = {'type': 'table', 'img_path': '', 'table_caption': [], 'table_footnote': []}
+        para_content = {
+            'type': 'table',
+            'img_path': '',
+            'table_caption': [],
+            'table_footnote': [],
+            "img_paths": [],  ### 표 안의 이미지 처리.
+        }
         for block in para_block['blocks']:
             if block['type'] == BlockType.TableBody:
                 for line in block['lines']:
                     for span in line['spans']:
                         if span['type'] == ContentType.Table:
-
                             if span.get('latex', ''):
                                 para_content['table_body'] = f"\n\n$\n {span['latex']}\n$\n\n"
                             elif span.get('html', ''):
@@ -230,6 +240,11 @@ def para_to_standard_format_v2(para_block, img_buket_path, page_idx, drop_reason
 
                             if span.get('image_path', ''):
                                 para_content['img_path'] = join_path(img_buket_path, span['image_path'])
+                        ### 표 안의 이미지 처리:
+                        if span['type'] == ContentType.Image:
+                            para_content["img_paths"].append(
+                                join_path(img_buket_path, span['image_path'])
+                            )
 
             if block['type'] == BlockType.TableCaption:
                 para_content['table_caption'].append(merge_para_with_text(block))
@@ -244,13 +259,13 @@ def para_to_standard_format_v2(para_block, img_buket_path, page_idx, drop_reason
 
 
 def union_make(
-    pdf_info_dict: List[Dict[str, Any]],
+    pdf_info_list: List[Dict[str, Any]],
     make_mode: str,
     drop_mode: str,
     img_buket_path: str = '',
 ) -> Union[str, List[Dict[str, Any]]]:
     output_content = []
-    for page_info in pdf_info_dict:
+    for page_info in pdf_info_list:
         # drop_reason_flag = False
         drop_reason = None
         if page_info.get('need_drop', False):

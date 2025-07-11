@@ -178,6 +178,7 @@ def parse_file(
         image_writer,
         monkeyocr=monkeyocr,
     )
+    # print(pipe_result)
 
     parsing_time = time.time() - start_time
     print(f"Parsing time: {parsing_time:.2f}s")

@@ -87,7 +87,6 @@ class MagicModel:
                     if layout_det1 == layout_det2:
                         continue
 
-                    print(layout_det1['category_id'], layout_det2['category_id'])
                     if layout_det1['category_id'] in [
                         0,
                         1,

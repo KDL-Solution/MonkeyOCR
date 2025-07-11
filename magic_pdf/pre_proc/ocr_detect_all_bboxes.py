@@ -82,14 +82,11 @@ def ocr_prepare_bboxes_for_layout_split_v2(
     add_bboxes(text_blocks, BlockType.Text, all_bboxes)
     add_bboxes(title_blocks, BlockType.Title, all_bboxes)
     add_bboxes(interline_equation_blocks, BlockType.InterlineEquation, all_bboxes)
-    print(all_bboxes)
 
     all_bboxes = fix_text_overlap_title_blocks(all_bboxes)
     all_bboxes = remove_need_drop_blocks(all_bboxes, discarded_blocks)
 
-
     all_bboxes = fix_interline_equation_overlap_text_blocks_with_hi_iou(all_bboxes)
-
 
     """discarded_blocks"""
     all_discarded_blocks = []
@@ -107,8 +104,8 @@ def ocr_prepare_bboxes_for_layout_split_v2(
             all_bboxes.remove(block)
             all_discarded_blocks.append(block)
 
-    all_bboxes = remove_overlaps_min_blocks(all_bboxes)
-    all_discarded_blocks = remove_overlaps_min_blocks(all_discarded_blocks)
+    # all_bboxes = remove_overlaps_min_blocks(all_bboxes)
+    # all_discarded_blocks = remove_overlaps_min_blocks(all_discarded_blocks)
     # all_bboxes, drop_reasons = remove_overlap_between_bbox_for_block(all_bboxes)
     all_bboxes.sort(key=lambda x: x[0]+x[1])
     return all_bboxes, all_discarded_blocks

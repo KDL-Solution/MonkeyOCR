@@ -743,6 +743,7 @@ def parse_page_core(
         #     page_w,
         #     page_h,
         # )
+    # print(img_body_blocks)
     all_bboxes, all_discarded_blocks = ocr_prepare_bboxes_for_layout_split_v2(
         img_body_blocks,
         img_caption_blocks,
@@ -757,6 +758,8 @@ def parse_page_core(
         page_w,
         page_h,
     )
+    # print("-" * 100)
+    # print(all_bboxes)
 
     spans = magic_model.get_all_spans(page_id)
 
@@ -765,9 +768,11 @@ def parse_page_core(
         all_bboxes,
         all_discarded_blocks,
     )  # 품어지는 요소는 여기서 제거됨!
+    # print("-" * 100)
+    # print(spans)
 
-    spans, dropped_spans_by_confidence = remove_overlaps_low_confidence_spans(spans)
-    spans, dropped_spans_by_span_overlap = remove_overlaps_min_spans(spans)
+    spans, _ = remove_overlaps_low_confidence_spans(spans)
+    # spans, _ = remove_overlaps_min_spans(spans)  ### 표 안의 이미지 처리.
 
     if parse_mode == SupportedPdfParseMethod.TXT:
         spans = txt_spans_extract_v2(page_doc, spans, all_bboxes, all_discarded_blocks, lang)
@@ -777,9 +782,13 @@ def parse_page_core(
     else:
         raise Exception('parse_mode must be txt or ocr')
 
+    # print("-" * 100)
+    # print(spans)
     discarded_block_with_spans, spans = fill_spans_in_blocks(
         all_discarded_blocks, spans, 0.4
     )
+    # print("-" * 100)
+    # print(spans)
     fix_discarded_blocks = fix_discarded_block(discarded_block_with_spans)
 
     if len(all_bboxes) == 0:
@@ -799,11 +808,19 @@ def parse_page_core(
             drop_reason,
         )
 
+    # 이 전에 이미 표 안의 이미지는 사라짐.
+    # print(spans)
     spans = ocr_cut_image_and_table(
         spans, page_doc, page_id, pdf_bytes_md5, imageWriter
     )
+    # print("-" * 100)
+    # print(spans)
     block_with_spans, spans = fill_spans_in_blocks(all_bboxes, spans, 0.5)
+    # print("-" * 100)
+    # print(spans)
     fix_blocks = fix_block_spans_v2(block_with_spans)
+    # print("-" * 100)
+    # print(fix_blocks)
 
     merge_title_blocks(fix_blocks)
 
@@ -823,6 +840,7 @@ def parse_page_core(
 
     images, tables, interline_equations = get_qa_need_list_v2(sorted_blocks)
 
+    # print(sorted_blocks)
     page_info = ocr_construct_page_component_v2(
         sorted_blocks,
         [],
@@ -837,6 +855,7 @@ def parse_page_core(
         need_drop,
         drop_reason,
     )
+    # print(page_info)
     return page_info
 
 
@@ -885,6 +904,7 @@ def pdf_parse_union(
             page_info = parse_page_core(
                 page, magic_model, page_id, pdf_bytes_md5, imageWriter, parse_mode, lang, monkeyocr
             )
+            # print(page_info)
         else:
             page_info = page.get_page_info()
             page_w = page_info.w
@@ -895,6 +915,8 @@ def pdf_parse_union(
         pdf_info_dict[f'page_{page_id}'] = page_info
 
     para_split(pdf_info_dict)
+    # print("-" * 100)
+    # print(pdf_info_dict)
 
     # pdf_info_list = dict_to_list(pdf_info_dict)
     pdf_info_list = list(pdf_info_dict.values())

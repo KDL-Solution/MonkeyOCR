@@ -70,15 +70,20 @@ def fill_spans_in_blocks(blocks, spans, radio):
             'bbox': block_bbox,
         }
         if block_type in [
-            BlockType.ImageBody, BlockType.ImageCaption, BlockType.ImageFootnote,
-            BlockType.TableBody, BlockType.TableCaption, BlockType.TableFootnote
+            BlockType.ImageBody,
+            BlockType.ImageCaption,
+            BlockType.ImageFootnote,
+            BlockType.TableBody,
+            BlockType.TableCaption,
+            BlockType.TableFootnote,
         ]:
             block_dict['group_id'] = block[-1]
         block_spans = []
         for span in spans:
             span_bbox = span['bbox']
             if calculate_overlap_area_in_bbox1_area_ratio(
-                    span_bbox, block_bbox) > radio:
+                    span_bbox, block_bbox,
+                ) > radio:
                 block_spans.append(span)
 
         block_dict['spans'] = block_spans
