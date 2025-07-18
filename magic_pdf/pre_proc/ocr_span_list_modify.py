@@ -17,8 +17,8 @@ def remove_overlaps_low_confidence_spans(
                 if span1 in dropped_spans or span2 in dropped_spans:
                     continue
                 else:
-                    if calculate_iou(span1['bbox'], span2['bbox']) > 0.9:
-                        if span1['score'] < span2['score']:
+                    if calculate_iou(span1["bbox"], span2["bbox"]) > 0.9:
+                        if span1["score"] < span2["score"]:
                             span_need_remove = span1
                         else:
                             span_need_remove = span2
@@ -31,38 +31,61 @@ def remove_overlaps_low_confidence_spans(
     if len(dropped_spans) > 0:
         for span_need_remove in dropped_spans:
             spans.remove(span_need_remove)
-            span_need_remove['tag'] = DropTag.SPAN_OVERLAP
+            span_need_remove["tag"] = DropTag.SPAN_OVERLAP
     return spans, dropped_spans
 
 
 def check_chars_is_overlap_in_span(chars):
     for i in range(len(chars)):
         for j in range(i + 1, len(chars)):
-            if calculate_iou(chars[i]['bbox'], chars[j]['bbox']) > 0.35:
+            if calculate_iou(chars[i]["bbox"], chars[j]["bbox"]) > 0.35:
                 return True
     return False
 
 
-def remove_overlaps_min_spans(spans):
+def remove_overlaps_min_spans(
+    spans,
+):
     dropped_spans = []
-
     for span1 in spans:
         for span2 in spans:
             if span1 != span2:
-
                 if span1 in dropped_spans or span2 in dropped_spans:
                     continue
-                else:
-                    overlap_box = get_minbox_if_overlap_by_ratio(span1['bbox'], span2['bbox'], 0.65)
-                    if overlap_box is not None:
-                        span_need_remove = next((span for span in spans if span['bbox'] == overlap_box), None)
-                        if span_need_remove is not None and span_need_remove not in dropped_spans:
-                            dropped_spans.append(span_need_remove)
-    if len(dropped_spans) > 0:
-        for span_need_remove in dropped_spans:
-            spans.remove(span_need_remove)
-            span_need_remove['tag'] = DropTag.SPAN_OVERLAP
 
+                ### nested table 처리:
+                bbox1 = span1["bbox"]
+                bbox2 = span2["bbox"]
+                area1 = (bbox1[2] - bbox1[0]) * (bbox1[3] - bbox1[1])
+                area2 = (bbox2[2] - bbox2[0]) * (bbox2[3] - bbox2[1])
+                if area1 < area2:
+                    continue
+
+                if (span1["type"], span2["type"]) in [
+                    ("table", "image"),
+                    ("table", "table"),
+                ]:
+                    continue
+                ### : nested table 처리
+
+                overlap_box = get_minbox_if_overlap_by_ratio(
+                    bbox1,
+                    bbox2,
+                    ratio=0.65,
+                )
+                if overlap_box is not None:
+                    # 면적이 작은 쪽을 제거:
+                    span_to_remove = next(
+                        (span for span in spans if span["bbox"] == overlap_box),
+                        None,
+                    )
+                    if span_to_remove is not None and span_to_remove not in dropped_spans:
+                        dropped_spans.append(span_to_remove)
+
+    if len(dropped_spans) > 0:
+        for span_to_remove in dropped_spans:
+            spans.remove(span_to_remove)
+            span_to_remove["tag"] = DropTag.SPAN_OVERLAP
     return spans, dropped_spans
 
 
@@ -72,10 +95,10 @@ def get_qa_need_list_v2(blocks):
     interline_equations = []
 
     for block in blocks:
-        if block['type'] == BlockType.Image:
+        if block["type"] == BlockType.Image:
             images.append(block)
-        elif block['type'] == BlockType.Table:
+        elif block["type"] == BlockType.Table:
             tables.append(block)
-        elif block['type'] == BlockType.InterlineEquation:
+        elif block["type"] == BlockType.InterlineEquation:
             interline_equations.append(block)
     return images, tables, interline_equations

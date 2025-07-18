@@ -312,8 +312,8 @@ def union_make(
                     img_buket_path,
                     page_idx,
                 )
-                # 사용되지 않는 듯해서 주섬 처리함.
-                # if drop_reason_flag:
+                # 사용되지 않는 듯해서 주섬 처리함:
+                # if drop_reason_flag
                 #     para_content: Dict[str, Any] = para_to_standard_format_v2(
                 #         para_block,
                 #         img_buket_path,

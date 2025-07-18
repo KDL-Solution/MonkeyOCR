@@ -174,7 +174,10 @@ def calculate_iou(bbox1, bbox2):
     return iou
 
 
-def calculate_overlap_area_2_minbox_area_ratio(bbox1, bbox2):
+def calculate_overlap_area_2_minbox_area_ratio(
+    bbox1,
+    bbox2,
+):
     # Determine the coordinates of the intersection rectangle
     x_left = max(bbox1[0], bbox2[0])
     y_top = max(bbox1[1], bbox2[1])
@@ -213,13 +216,18 @@ def calculate_overlap_area_in_bbox1_area_ratio(bbox1, bbox2):
         return intersection_area / bbox1_area
 
 
-def get_minbox_if_overlap_by_ratio(bbox1, bbox2, ratio):
+def get_minbox_if_overlap_by_ratio(
+    bbox1,
+    bbox2,
+    ratio,
+):
     x1_min, y1_min, x1_max, y1_max = bbox1
     x2_min, y2_min, x2_max, y2_max = bbox2
     area1 = (x1_max - x1_min) * (y1_max - y1_min)
     area2 = (x2_max - x2_min) * (y2_max - y2_min)
     overlap_ratio = calculate_overlap_area_2_minbox_area_ratio(bbox1, bbox2)
     if overlap_ratio > ratio:
+        # 면적이 작은 쪽을 출력:
         if area1 <= area2:
             return bbox1
         else:

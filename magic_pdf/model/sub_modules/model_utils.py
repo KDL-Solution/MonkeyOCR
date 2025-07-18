@@ -1,24 +1,30 @@
 import time
-
 import torch
 from PIL import Image
 from loguru import logger
+from typing import Tuple, List, Dict, Any
+from PIL import Image, ImageDraw
 
 from magic_pdf.libs.clean_memory import clean_memory
 
 
-def crop_img(input_res, input_pil_img, crop_paste_x=0, crop_paste_y=0):
-    crop_xmin, crop_ymin = int(input_res['poly'][0]), int(input_res['poly'][1])
-    crop_xmax, crop_ymax = int(input_res['poly'][4]), int(input_res['poly'][5])
+def crop(
+    image: Image.Image,
+    res: Dict[str, Any],
+    crop_paste_x: int = 0,
+    crop_paste_y: int = 0,
+) -> Tuple[Image.Image, List]:
+    crop_xmin, crop_ymin = int(res["poly"][0]), int(res["poly"][1])
+    crop_xmax, crop_ymax = int(res["poly"][4]), int(res["poly"][5])
     # Create a white background with an additional width and height of 50
     crop_new_width = crop_xmax - crop_xmin + crop_paste_x * 2
     crop_new_height = crop_ymax - crop_ymin + crop_paste_y * 2
-    return_image = Image.new('RGB', (crop_new_width, crop_new_height), 'white')
+    return_image = Image.new("RGB", (crop_new_width, crop_new_height), "white")
 
     # Crop image
     crop_box = (crop_xmin, crop_ymin, crop_xmax, crop_ymax)
-    cropped_img = input_pil_img.crop(crop_box)
-    return_image.paste(cropped_img, (crop_paste_x, crop_paste_y))
+    image_crop = image.crop(crop_box)
+    return_image.paste(image_crop, (crop_paste_x, crop_paste_y))
     return_list = [crop_paste_x, crop_paste_y, crop_xmin, crop_ymin, crop_xmax, crop_ymax, crop_new_width, crop_new_height]
     return return_image, return_list
 
@@ -29,14 +35,14 @@ def get_res_list_from_layout_res(layout_res):
     table_res_list = []
     single_page_mfdetrec_res = []
     for res in layout_res:
-        if int(res['category_id']) in [13, 14]:
+        if int(res["category_id"]) in [13, 14]:
             single_page_mfdetrec_res.append({
-                "bbox": [int(res['poly'][0]), int(res['poly'][1]),
-                         int(res['poly'][4]), int(res['poly'][5])],
+                "bbox": [int(res["poly"][0]), int(res["poly"][1]),
+                         int(res["poly"][4]), int(res["poly"][5])],
             })
-        elif int(res['category_id']) in [0, 1, 2, 4, 6, 7]:
+        elif int(res["category_id"]) in [0, 1, 2, 4, 6, 7]:
             ocr_res_list.append(res)
-        elif int(res['category_id']) in [5]:
+        elif int(res["category_id"]) in [5]:
             table_res_list.append(res)
     return ocr_res_list, table_res_list, single_page_mfdetrec_res
 
@@ -51,7 +57,7 @@ def clean_vram(device, vram_threshold=8):
 
 
 def get_vram(device):
-    if torch.cuda.is_available() and device != 'cpu':
+    if torch.cuda.is_available() and device != "cpu":
         total_memory = torch.cuda.get_device_properties(device).total_memory / (1024 ** 3)
         return total_memory
     elif str(device).startswith("npu"):
@@ -61,3 +67,27 @@ def get_vram(device):
             return total_memory
     else:
         return None
+
+
+### nested table 처리:
+def mask(
+    image: Image.Image,
+    res_ls: List[Dict[str, Any]],
+    fill_color: str = "red",
+    outline_color: str = "red",
+    outline_width: int = 6,
+) -> Image.Image:
+    image_copy = image.copy()
+    draw = ImageDraw.Draw(image_copy)
+    for res in res_ls:
+        xmin, ymin = int(res["poly"][0]), int(res["poly"][1])
+        xmax, ymax = int(res["poly"][4]), int(res["poly"][5])
+        # draw.rectangle([xmin, ymin, xmax, ymax], fill="white")
+        draw.rectangle(
+            [xmin, ymin, xmax, ymax],
+            fill=fill_color,
+            outline=outline_color,
+            width=outline_width,
+        )
+    return image_copy
+### : nested table 처리

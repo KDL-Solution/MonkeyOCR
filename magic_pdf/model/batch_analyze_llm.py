@@ -2,10 +2,10 @@ import base64
 import copy
 import time
 import re
-import cv2
 import numpy as np
-import torch
-
+# import cv2
+# import torch
+from typing import List
 from loguru import logger
 from PIL import Image
 
@@ -15,7 +15,10 @@ from magic_pdf.config.chat_content_type import TaskInstructions, LoraType, LoraI
 from io import BytesIO, StringIO
 from PIL import Image
 from magic_pdf.model.sub_modules.model_utils import (
-    clean_vram, crop_img)
+    clean_vram,
+    crop,
+    mask,
+)
 from docling_core.types.doc.document import DocTagsDocument, DoclingDocument
 
 YOLO_LAYOUT_BASE_BATCH_SIZE = 1
@@ -165,66 +168,101 @@ class BatchAnalyzeLLM:
         self.model = model
         self.backend = backend
 
-    def __call__(self, images: list):
-        images_layout_res = []
-
+    def __call__(
+        self,
+        images: List[np.ndarray],
+    ):
         layout_start_time = time.time()
+        images_layout_res = []
         if self.model.layout_model_name == MODEL_NAME.DocLayout_YOLO:
             # doclayout_yolo
             layout_images = []
             modified_images = []
             for image_index, image in enumerate(images):
-                pil_img = Image.fromarray(image)
-                layout_images.append(pil_img)
+                image = Image.fromarray(image)
+                layout_images.append(image)
 
             images_layout_res += self.model.layout_model.batch_predict(
                 # layout_images, self.batch_ratio * YOLO_LAYOUT_BASE_BATCH_SIZE
-                layout_images, YOLO_LAYOUT_BASE_BATCH_SIZE
+                layout_images,
+                YOLO_LAYOUT_BASE_BATCH_SIZE
             )
 
             for image_index, useful_list in modified_images:
                 for res in images_layout_res[image_index]:
-                    for i in range(len(res['poly'])):
-                        if i % 2 == 0:
-                            res['poly'][i] = (
-                                res['poly'][i] - useful_list[0] + useful_list[2]
+                    for idx in range(len(res['poly'])):
+                        if idx % 2 == 0:
+                            res['poly'][idx] = (
+                                res['poly'][idx] - useful_list[0] + useful_list[2]
                             )
                         else:
-                            res['poly'][i] = (
-                                res['poly'][i] - useful_list[1] + useful_list[3]
+                            res['poly'][idx] = (
+                                res['poly'][idx] - useful_list[1] + useful_list[3]
                             )
         logger.info(
             f'layout time: {round(time.time() - layout_start_time, 2)}, image num: {len(images)}'
         )
 
         clean_vram(self.model.device, vram_threshold=8)
+
         llm_ocr_start = time.time()
         new_images_all = []
         cids_all = []
         page_idxs = []
         for index in range(len(images)):
             layout_res = images_layout_res[index]
-            pil_img = Image.fromarray(images[index])
+            image = Image.fromarray(images[index])
             new_images = []
             cids = []
             for res in layout_res:
-                new_image, useful_list = crop_img(
-                    res, pil_img, crop_paste_x=50, crop_paste_y=50
+            # for idx, res in enumerate(layout_res):
+                image_copy = image.copy()
+
+                ### nested table 처리:
+                if res["category_id"] == CategoryId.TableBody:
+                    res_ls = [
+                        i for i in layout_res
+                        if (
+                            i != res
+                            and i["category_id"] in [
+                                CategoryId.ImageBody,
+                                CategoryId.TableBody,
+                            ]
+                            and i["poly"] != res["poly"]
+                        )
+                    ]
+                    image_copy = mask(
+                        image=image_copy,
+                        res_ls=res_ls,
+                    )
+                ### : nested table 처리
+
+                image_copy, useful_list = crop(
+                    image=image_copy,
+                    res=res,
+                    crop_paste_x=50,
+                    crop_paste_y=50,
                 )
-                new_images.append(new_image)
+                # image_copy.save(f"/home/koreadeep/eric/workspace/{idx}_{res['category_id']}.jpg")
+
+                new_images.append(image_copy)
                 cids.append(res['category_id'])
             
             new_images_all.extend(new_images)
             cids_all.extend(cids)
             page_idxs.append(len(new_images_all) - len(new_images))
+
         logger.info('VLM OCR start...')
-        ocr_result = self.batch_llm_ocr(new_images_all, cids_all)
+        ocr_result = self.batch_llm_ocr(
+            images=new_images_all,
+            cat_ids=cids_all,
+        )
         for index in range(len(images)):
             ocr_results = []
             layout_res = images_layout_res[index]
-            for i in range(len(layout_res)):
-                res = layout_res[i]
-                ocr = ocr_result[page_idxs[index]+i]
+            for idx in range(len(layout_res)):
+                res = layout_res[idx]
+                ocr = ocr_result[page_idxs[index]+idx]
                 # ocr = self.llm_ocr(new_image, res['category_id'])
                 if res['category_id'] in [
                     CategoryId.InterlineEquation_Layout, 
@@ -259,7 +297,12 @@ class BatchAnalyzeLLM:
         )
         return images_layout_res
 
-    def batch_llm_ocr(self, images, cat_ids, max_batch_size=8):
+    def batch_llm_ocr(
+        self,
+        images,
+        cat_ids,
+        # max_batch_size=8,
+    ):
         assert len(images) == len(cat_ids)
                     
         new_images = []

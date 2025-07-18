@@ -107,7 +107,6 @@ class InferenceResultLLM(InferenceResultBase):
 
         def proc(*args, **kwargs) -> PipeResultLLM:
             res = pdf_parse_union(*args, **kwargs)
-            # print(res)
             res['_parse_type'] = PARSE_TYPE_OCR
             res['_version_name'] = __version__
             if 'lang' in kwargs and kwargs['lang'] is not None:
