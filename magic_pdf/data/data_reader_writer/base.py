@@ -1,10 +1,11 @@
-
 from abc import ABC, abstractmethod
 
 
 class DataReader(ABC):
-
-    def read(self, path: str) -> bytes:
+    def read(
+        self,
+        path: str,
+    ) -> bytes:
         """Read the file.
 
         Args:

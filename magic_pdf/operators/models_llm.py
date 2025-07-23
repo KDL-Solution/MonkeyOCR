@@ -12,8 +12,10 @@ from magic_pdf.libs.version import __version__
 from magic_pdf.operators.pipes_llm import PipeResultLLM
 from magic_pdf.pdf_parse_union_core_v2_llm import pdf_parse_union
 from magic_pdf.operators import InferenceResultBase
+from magic_pdf.model.custom_model import MonkeyOCR
 
-class InferenceResultLLM(InferenceResultBase):
+
+class LLMInferenceResult(InferenceResultBase):
     def __init__(self, inference_results: list, dataset: Dataset):
         """Initialized method.
 
@@ -72,7 +74,7 @@ class InferenceResultLLM(InferenceResultBase):
     def pipe_ocr_mode(
         self,
         imageWriter: DataWriter,
-        MonkeyOCR_model,
+        monkeyocr: MonkeyOCR,
         start_page_id=0,
         end_page_id=None,
         debug_mode=False,
@@ -109,6 +111,6 @@ class InferenceResultLLM(InferenceResultBase):
             end_page_id=end_page_id,
             debug_mode=debug_mode,
             lang=lang,
-            MonkeyOCR_model=MonkeyOCR_model
+            monkeyocr=monkeyocr
         )
         return res

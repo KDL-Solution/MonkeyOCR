@@ -7,7 +7,7 @@ from loguru import logger
 
 from magic_pdf.config.enums import SupportedPdfParseMethod
 from magic_pdf.data.schemas import PageInfo
-from magic_pdf.data.utils import fitz_doc_to_image
+from magic_pdf.data.utils import fitz_page_to_image
 from magic_pdf.filter import classify
 
 
@@ -133,7 +133,7 @@ class Dataset(ABC):
         pass
 
 
-class PymuDocDataset(Dataset):
+class PDFDataset(Dataset):
     def __init__(self, bits: bytes, lang=None):
         """Initialize the dataset, which wraps the pymudoc documents.
 
@@ -141,7 +141,7 @@ class PymuDocDataset(Dataset):
             bits (bytes): the bytes of the pdf
         """
         self._raw_fitz = fitz.open('pdf', bits)
-        self._records = [Doc(v) for v in self._raw_fitz]
+        self._pages = [FitzPage(v) for v in self._raw_fitz]
         self._data_bits = bits
         self._raw_data = bits
 
@@ -150,13 +150,14 @@ class PymuDocDataset(Dataset):
         else:
             self._lang = lang
             logger.info(f"lang: {lang}")
+
     def __len__(self) -> int:
         """The page number of the pdf."""
-        return len(self._records)
+        return len(self._pages)
 
     def __iter__(self) -> Iterator[PageableData]:
         """Yield the page doc object."""
-        return iter(self._records)
+        return iter(self._pages)
 
     def supported_methods(self) -> list[SupportedPdfParseMethod]:
         """The method supported by this dataset.
@@ -179,7 +180,7 @@ class PymuDocDataset(Dataset):
         Returns:
             PageableData: the page doc object
         """
-        return self._records[page_id]
+        return self._pages[page_id]
 
     def dump_to_file(self, file_path: str):
         """Dump the file
@@ -218,7 +219,7 @@ class PymuDocDataset(Dataset):
     def clone(self):
         """clone this dataset
         """
-        return PymuDocDataset(self._raw_data)
+        return PDFDataset(self._raw_data)
 
 
 class ImageDataset(Dataset):
@@ -230,17 +231,17 @@ class ImageDataset(Dataset):
         """
         pdf_bytes = fitz.open(stream=bits).convert_to_pdf()
         self._raw_fitz = fitz.open('pdf', pdf_bytes)
-        self._records = [Doc(v) for v in self._raw_fitz]
+        self._pages = [FitzPage(v) for v in self._raw_fitz]
         self._raw_data = bits
         self._data_bits = pdf_bytes
 
     def __len__(self) -> int:
         """The length of the dataset."""
-        return len(self._records)
+        return len(self._pages)
 
     def __iter__(self) -> Iterator[PageableData]:
         """Yield the page object."""
-        return iter(self._records)
+        return iter(self._pages)
 
     def supported_methods(self):
         """The method supported by this dataset.
@@ -263,7 +264,7 @@ class ImageDataset(Dataset):
         Returns:
             PageableData: the page doc object
         """
-        return self._records[page_id]
+        return self._pages[page_id]
 
     def dump_to_file(self, file_path: str):
         """Dump the file
@@ -301,11 +302,11 @@ class ImageDataset(Dataset):
         """
         return ImageDataset(self._raw_data)
 
-class Doc(PageableData):
+class FitzPage(PageableData):
     """Initialized with pymudoc object."""
 
-    def __init__(self, doc: fitz.Page):
-        self._doc = doc
+    def __init__(self, page: fitz.Page):
+        self._doc = page
 
     def get_image(self) -> dict:
         """Return the image info.
@@ -317,7 +318,7 @@ class Doc(PageableData):
                 height: int
             }
         """
-        return fitz_doc_to_image(self._doc)
+        return fitz_page_to_image(self._doc)
 
     def get_doc(self) -> fitz.Page:
         """Get the pymudoc object.

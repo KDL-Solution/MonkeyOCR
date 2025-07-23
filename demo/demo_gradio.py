@@ -10,7 +10,7 @@ import tempfile
 import uuid
 
 from magic_pdf.data.data_reader_writer import FileBasedDataWriter, FileBasedDataReader
-from magic_pdf.data.dataset import PymuDocDataset, ImageDataset
+from magic_pdf.data.dataset import PDFDataset, ImageDataset
 from magic_pdf.model.doc_analyze_by_custom_model_llm import doc_analyze_llm
 from magic_pdf.model.custom_model import MonkeyOCR
 from PIL import Image
@@ -144,7 +144,7 @@ if __name__ == '__main__':
         if full_name.split(".")[-1] in ['jpg', 'jpeg', 'png']:
             ds = ImageDataset(data_bytes)
         else:
-            ds = PymuDocDataset(data_bytes)
+            ds = PDFDataset(data_bytes)
         infer_result = ds.apply(doc_analyze_llm, MonkeyOCR_model=MonkeyOCR_model)
         pipe_result = infer_result.pipe_ocr_mode(image_writer, MonkeyOCR_model=MonkeyOCR_model)
         layout_pdf_path = os.path.join(parent_path, f"{name}_layout.pdf")

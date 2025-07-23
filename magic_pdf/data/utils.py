@@ -6,7 +6,10 @@ from magic_pdf.utils.annotations import ImportPIL
 
 
 @ImportPIL
-def fitz_doc_to_image(doc, dpi=200) -> dict:
+def fitz_page_to_image(
+    page,
+    dpi=200,
+) -> dict:
     """Convert fitz.Document to image, Then convert the image to numpy array.
 
     Args:
@@ -18,18 +21,18 @@ def fitz_doc_to_image(doc, dpi=200) -> dict:
     """
     from PIL import Image
     mat = fitz.Matrix(dpi / 72, dpi / 72)
-    pm = doc.get_pixmap(matrix=mat, alpha=False)
+    pm = page.get_pixmap(matrix=mat, alpha=False)
 
     # If the width or height exceeds 4500 after scaling, do not scale further.
     if pm.width > 4500 or pm.height > 4500:
-        pm = doc.get_pixmap(matrix=fitz.Matrix(1, 1), alpha=False)
+        pm = page.get_pixmap(matrix=fitz.Matrix(1, 1), alpha=False)
 
     img = Image.frombytes('RGB', (pm.width, pm.height), pm.samples)
     img = np.array(img)
 
     img_dict = {'img': img, 'width': pm.width, 'height': pm.height}
-
     return img_dict
+
 
 @ImportPIL
 def load_images_from_pdf(pdf_bytes: bytes, dpi=200, start_page_id=0, end_page_id=None) -> list:

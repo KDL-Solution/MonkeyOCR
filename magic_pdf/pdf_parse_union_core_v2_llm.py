@@ -5,7 +5,6 @@ import re
 import statistics
 import time
 from typing import List
-
 import fitz
 import torch
 from loguru import logger
@@ -13,22 +12,28 @@ from loguru import logger
 from magic_pdf.config.enums import SupportedPdfParseMethod
 from magic_pdf.config.ocr_content_type import BlockType, ContentType
 from magic_pdf.data.dataset import Dataset, PageableData
-from magic_pdf.libs.boxbase import calculate_overlap_area_in_bbox1_area_ratio, __is_overlaps_y_exceeds_threshold
+from magic_pdf.libs.boxbase import (
+    calculate_overlap_area_in_bbox1_area_ratio,
+    __is_overlaps_y_exceeds_threshold,
+)
 from magic_pdf.libs.clean_memory import clean_memory
 from magic_pdf.libs.convert_utils import dict_to_list
 from magic_pdf.libs.hash_utils import compute_md5
 from magic_pdf.libs.pdf_image_tools import cut_image_to_pil_image
 from magic_pdf.model.magic_model import MagicModel
-
-
 from magic_pdf.model.sub_modules.model_init import AtomModelSingleton
 from magic_pdf.post_proc.para_split_v3 import para_split
 from magic_pdf.pre_proc.construct_page_dict import ocr_construct_page_component_v2
 from magic_pdf.pre_proc.cut_image import ocr_cut_image_and_table
 from magic_pdf.pre_proc.ocr_detect_all_bboxes import ocr_prepare_bboxes_for_layout_split_v2
 from magic_pdf.pre_proc.ocr_dict_merge import fill_spans_in_blocks, fix_block_spans_v2, fix_discarded_block
-from magic_pdf.pre_proc.ocr_span_list_modify import get_qa_need_list_v2, remove_overlaps_low_confidence_spans, \
-    remove_overlaps_min_spans, check_chars_is_overlap_in_span
+from magic_pdf.pre_proc.ocr_span_list_modify import (
+    get_qa_need_list_v2,
+    remove_overlaps_low_confidence_spans,
+    remove_overlaps_min_spans,
+    check_chars_is_overlap_in_span,
+)
+from magic_pdf.model.custom_model import MonkeyOCR
 
 
 def __replace_STX_ETX(text_str: str):
@@ -262,8 +267,6 @@ def txt_spans_extract_v2(pdf_page, spans, all_bboxes, all_discarded_blocks, lang
     empty_spans = fill_char_in_spans(new_spans, all_pymu_chars)
 
     if len(empty_spans) > 0:
-
-
         atom_model_manager = AtomModelSingleton()
         ocr_model = atom_model_manager.get_atom_model(
             atom_model_name='ocr',
@@ -273,7 +276,6 @@ def txt_spans_extract_v2(pdf_page, spans, all_bboxes, all_discarded_blocks, lang
         )
 
         for span in empty_spans:
-
             span_img = cut_image_to_pil_image(span['bbox'], pdf_page, mode='cv2')
             ocr_res = ocr_model.ocr(span_img, det=False)
             if ocr_res and len(ocr_res) > 0:
@@ -402,7 +404,7 @@ def insert_lines_into_block(block_bbox, line_height, page_w, page_h):
         return [[x0, y0, x1, y1]]
 
 
-def sort_lines_by_model(fix_blocks, page_w, page_h, line_height, MonkeyOCR_model):
+def sort_lines_by_model(fix_blocks, page_w, page_h, line_height, monkeyocr: MonkeyOCR):
     page_line_list = []
 
     def add_lines_to_block(b):
@@ -469,7 +471,7 @@ def sort_lines_by_model(fix_blocks, page_w, page_h, line_height, MonkeyOCR_model
             1000 >= right >= left >= 0 and 1000 >= bottom >= top >= 0
         ), f'Invalid box. right: {right}, left: {left}, bottom: {bottom}, top: {top}'  # noqa: E126, E121
         boxes.append([left, top, right, bottom])
-    model = MonkeyOCR_model.layoutreader_model
+    model = monkeyocr.layoutreader_model
     with torch.no_grad():
         orders = do_predict(boxes, model)
     sorted_bboxes = [page_line_list[i] for i in orders]
@@ -594,7 +596,7 @@ def remove_outside_spans(spans, all_bboxes, all_discarded_blocks):
 
 
 def parse_page_core(
-    page_doc: PageableData, magic_model, page_id, pdf_bytes_md5, imageWriter, parse_mode, lang, MonkeyOCR_model
+    page_doc: PageableData, magic_model, page_id, pdf_bytes_md5, imageWriter, parse_mode, lang, monkeyocr: MonkeyOCR,
 ):
     need_drop = False
     drop_reason = []
@@ -755,7 +757,7 @@ def parse_page_core(
 
     line_height = get_line_height(fix_blocks)
 
-    sorted_bboxes = sort_lines_by_model(fix_blocks, page_w, page_h, line_height, MonkeyOCR_model)
+    sorted_bboxes = sort_lines_by_model(fix_blocks, page_w, page_h, line_height, monkeyocr)
 
     fix_blocks = cal_block_index(fix_blocks, sorted_bboxes)
 
@@ -791,7 +793,7 @@ def pdf_parse_union(
     dataset: Dataset,
     imageWriter,
     parse_mode,
-    MonkeyOCR_model,
+    monkeyocr: MonkeyOCR,
     start_page_id=0,
     end_page_id=None,
     debug_mode=False,
@@ -827,7 +829,7 @@ def pdf_parse_union(
 
         if start_page_id <= page_id <= end_page_id:
             page_info = parse_page_core(
-                page, magic_model, page_id, pdf_bytes_md5, imageWriter, parse_mode, lang, MonkeyOCR_model
+                page, magic_model, page_id, pdf_bytes_md5, imageWriter, parse_mode, lang, monkeyocr
             )
         else:
             page_info = page.get_page_info()
@@ -845,7 +847,7 @@ def pdf_parse_union(
         'pdf_info': pdf_info_list,
     }
 
-    clean_memory(MonkeyOCR_model.device)
+    clean_memory(monkeyocr.device)
 
     return new_pdf_info_dict
 

@@ -11,10 +11,12 @@ chat_config:
   backend: vllm_api
   backend_config:
     vllm_api:
-      url: http://192.168.20.58:9800/v1
-      model_name: Qwen2.5-VL-7B-Instruct 
-      loras:
-          table: table_image_otsl  
+      # url: http://192.168.20.58:9800/v1
+      # model_name: Qwen2.5-VL-7B-Instruct
+      url: http://192.168.20.62:9062/v1
+      model_name: Qwen2.5-VL-72B-Instruct
+      # loras:
+      #     table_image_otsl: table_image_otsl  
     openai_api:
       url: https://api.openai.com/v1
       model_name: gpt-4.1

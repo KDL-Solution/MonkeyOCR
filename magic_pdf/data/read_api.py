@@ -7,12 +7,12 @@ from pathlib import Path
 from magic_pdf.config.exceptions import EmptyData, InvalidParams
 from magic_pdf.data.data_reader_writer import (FileBasedDataReader,
                                                MultiBucketS3DataReader)
-from magic_pdf.data.dataset import ImageDataset, PymuDocDataset
+from magic_pdf.data.dataset import ImageDataset, PDFDataset
 from magic_pdf.utils.office_to_pdf import convert_file_to_pdf, ConvertToPdfError
 
 def read_jsonl(
     s3_path_or_local: str, s3_client: MultiBucketS3DataReader | None = None
-) -> list[PymuDocDataset]:
+) -> list[PDFDataset]:
     """Read the jsonl file and return the list of PymuDocDataset.
 
     Args:
@@ -47,10 +47,10 @@ def read_jsonl(
             bits_arr.append(s3_client.read(pdf_path))
         else:
             bits_arr.append(FileBasedDataReader('').read(pdf_path))
-    return [PymuDocDataset(bits) for bits in bits_arr]
+    return [PDFDataset(bits) for bits in bits_arr]
 
 
-def read_local_pdfs(path: str) -> list[PymuDocDataset]:
+def read_local_pdfs(path: str) -> list[PDFDataset]:
     """Read pdf from path or directory.
 
     Args:
@@ -66,14 +66,14 @@ def read_local_pdfs(path: str) -> list[PymuDocDataset]:
             for file in files:
                 suffix = file.split('.')
                 if suffix[-1] == 'pdf':
-                    ret.append( PymuDocDataset(reader.read(os.path.join(root, file))))
+                    ret.append( PDFDataset(reader.read(os.path.join(root, file))))
         return ret
     else:
         reader = FileBasedDataReader()
         bits = reader.read(path)
-        return [PymuDocDataset(bits)]
+        return [PDFDataset(bits)]
 
-def read_local_office(path: str) -> list[PymuDocDataset]:
+def read_local_office(path: str) -> list[PDFDataset]:
     """Read ms-office file (ppt, pptx, doc, docx) from path or directory.
 
     Args:
@@ -112,7 +112,7 @@ def read_local_office(path: str) -> list[PymuDocDataset]:
             raise e
         fn_path = Path(fn)
         pdf_fn = f"{temp_dir}/{fn_path.stem}.pdf"
-        ret.append(PymuDocDataset(reader.read(pdf_fn)))
+        ret.append(PDFDataset(reader.read(pdf_fn)))
     shutil.rmtree(temp_dir)
     return ret
 

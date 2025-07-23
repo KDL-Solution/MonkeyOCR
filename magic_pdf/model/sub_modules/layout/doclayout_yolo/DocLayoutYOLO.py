@@ -1,6 +1,7 @@
 from doclayout_yolo import YOLOv10
 import torch
 
+
 class DocLayoutYOLOModel(object):
     def __init__(self, weight, device):
         self.model = YOLOv10(weight)
@@ -58,5 +59,4 @@ class DocLayoutYOLOModel(object):
                     }
                     layout_res.append(new_item)
                 images_layout_res.append(layout_res)
-
         return images_layout_res

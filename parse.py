@@ -9,7 +9,7 @@ import torch.distributed as dist
 from pdf2image import convert_from_path
 
 from magic_pdf.data.data_reader_writer import FileBasedDataWriter, FileBasedDataReader
-from magic_pdf.data.dataset import PymuDocDataset, ImageDataset
+from magic_pdf.data.dataset import PDFDataset, ImageDataset
 from magic_pdf.model.doc_analyze_by_custom_model_llm import doc_analyze_llm
 from magic_pdf.model.custom_model import MonkeyOCR
 
@@ -239,7 +239,7 @@ def parse_pdf(input_file, output_dir, MonkeyOCR_model):
     # Create dataset instance
     file_extension = input_file.split(".")[-1].lower()
     if file_extension == "pdf":
-        ds = PymuDocDataset(file_bytes)
+        ds = PDFDataset(file_bytes)
     else:
         ds = ImageDataset(file_bytes)
     

@@ -3,7 +3,7 @@ import os
 import time
 
 from magic_pdf.data.data_reader_writer import FileBasedDataWriter, FileBasedDataReader
-from magic_pdf.data.dataset import PymuDocDataset, ImageDataset
+from magic_pdf.data.dataset import PDFDataset, ImageDataset
 from magic_pdf.model.doc_analyze_by_custom_model_llm import doc_analyze_llm
 from magic_pdf.model.custom_model import MonkeyOCR
 import torch.distributed as dist
@@ -32,7 +32,7 @@ if __name__ == "__main__":
     # proc
     ## Create Dataset Instance
     if pdf_file_name.split(".")[-1] == "pdf":
-        ds = PymuDocDataset(pdf_bytes)
+        ds = PDFDataset(pdf_bytes)
     else:
         ds = ImageDataset(pdf_bytes)
 
