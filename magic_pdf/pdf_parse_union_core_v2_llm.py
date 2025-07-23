@@ -780,7 +780,7 @@ def parse_page_core(
     )  # 품어지는 요소는 여기서 제거됨!
 
     spans, _ = remove_overlaps_low_confidence_spans(spans)
-    spans, _ = remove_overlaps_min_spans(spans)  ### nested table 처리
+    spans, _ = remove_overlaps_min_spans(spans)
 
     if parse_mode == SupportedPdfParseMethod.TXT:
         spans = txt_spans_extract_v2(page_doc, spans, all_bboxes, all_discarded_blocks, lang)

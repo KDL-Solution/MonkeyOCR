@@ -212,10 +212,10 @@ class BatchAnalyzeLLM:
         for index in range(len(images)):
             layout_res = images_layout_res[index]
             image = Image.fromarray(images[index])
+
             new_images = []
             cids = []
             for res in layout_res:
-            # for idx, res in enumerate(layout_res):
                 image_copy = image.copy()
 
                 ### nested table 처리:
@@ -231,10 +231,11 @@ class BatchAnalyzeLLM:
                             and i["poly"] != res["poly"]
                         )
                     ]
-                    image_copy = mask(
-                        image=image_copy,
-                        res_ls=res_ls,
-                    )
+                    # image_copy = mask(
+                    #     image=image_copy,
+                    #     res_ls=res_ls,
+                    # )
+                    image_copy.save(f"/home/eric/workspace/image_copy_mask.jpg")
                 ### : nested table 처리
 
                 image_copy, useful_list = crop(
@@ -243,7 +244,6 @@ class BatchAnalyzeLLM:
                     crop_paste_x=50,
                     crop_paste_y=50,
                 )
-                # image_copy.save(f"/home/koreadeep/eric/workspace/{idx}_{res['category_id']}.jpg")
 
                 new_images.append(image_copy)
                 cids.append(res['category_id'])

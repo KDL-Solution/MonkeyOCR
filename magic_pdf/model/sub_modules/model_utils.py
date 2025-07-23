@@ -3,7 +3,7 @@ import torch
 from PIL import Image
 from loguru import logger
 from typing import Tuple, List, Dict, Any
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 from magic_pdf.libs.clean_memory import clean_memory
 
@@ -73,21 +73,31 @@ def get_vram(device):
 def mask(
     image: Image.Image,
     res_ls: List[Dict[str, Any]],
-    fill_color: str = "red",
-    outline_color: str = "red",
-    outline_width: int = 6,
+    bbox_color: str = "red",
+    font_path: str = "arial.ttf",
+    font_size: int = 32,
+    text_color: str = "blue",
 ) -> Image.Image:
     image_copy = image.copy()
     draw = ImageDraw.Draw(image_copy)
-    for res in res_ls:
-        xmin, ymin = int(res["poly"][0]), int(res["poly"][1])
-        xmax, ymax = int(res["poly"][4]), int(res["poly"][5])
-        # draw.rectangle([xmin, ymin, xmax, ymax], fill="white")
+    font = ImageFont.truetype(font_path, font_size)
+    for idx, res in enumerate(
+        res_ls,
+        start=1,
+    ):
+        left = int(res["poly"][0])
+        top = int(res["poly"][1])
+        right = int(res["poly"][4])
+        bottom = int(res["poly"][5])
         draw.rectangle(
-            [xmin, ymin, xmax, ymax],
-            fill=fill_color,
-            outline=outline_color,
-            width=outline_width,
+            (left, top, right, bottom),
+            fill=bbox_color,
+        )
+        draw.text(
+            (left, top),
+            f"[|ITEM-{idx:02d}|]",
+            fill=text_color,
+            font=font,
         )
     return image_copy
 ### : nested table 처리
