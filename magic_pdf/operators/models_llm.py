@@ -4,7 +4,7 @@ import os
 from typing import Callable
 
 from magic_pdf.config.constants import PARSE_TYPE_OCR
-from magic_pdf.config.enums import SupportedPdfParseMethod
+# from magic_pdf.config.enums import SupportedPdfParseMethod
 from magic_pdf.data.data_reader_writer import DataWriter
 from magic_pdf.data.dataset import Dataset
 from magic_pdf.libs.draw_bbox import draw_model_bbox
@@ -12,7 +12,7 @@ from magic_pdf.libs.version import __version__
 from magic_pdf.operators.pipes_llm import PipeResultLLM
 from magic_pdf.pdf_parse_union_core_v2_llm import pdf_parse_union
 from magic_pdf.operators import InferenceResultBase
-from magic_pdf.model.custom_model import MonkeyOCR
+from magic_pdf.model.monkeyocr import MonkeyOCR
 
 
 class LLMInferenceResult(InferenceResultBase):
@@ -73,7 +73,7 @@ class LLMInferenceResult(InferenceResultBase):
 
     def pipe_ocr_mode(
         self,
-        imageWriter: DataWriter,
+        image_writer: DataWriter,
         monkeyocr: MonkeyOCR,
         start_page_id=0,
         end_page_id=None,
@@ -94,23 +94,28 @@ class LLMInferenceResult(InferenceResultBase):
             PipeResultLLM: the result
         """
 
-        def proc(*args, **kwargs) -> PipeResultLLM:
+        def proc(
+            *args,
+            **kwargs,
+        ) -> PipeResultLLM:
             res = pdf_parse_union(*args, **kwargs)
             res['_parse_type'] = PARSE_TYPE_OCR
             res['_version_name'] = __version__
-            if 'lang' in kwargs and kwargs['lang'] is not None:
-                res['lang'] = kwargs['lang']
+            ### 미사용:
+            # if 'lang' in kwargs and kwargs['lang'] is not None:
+            #     res['lang'] = kwargs['lang']
+            ### : 미사용
             return PipeResultLLM(res, self._dataset)
 
         res = self.apply(
             proc,
             self._dataset,
-            imageWriter,
-            SupportedPdfParseMethod.OCR,
+            image_writer,
+            # parse_mode=SupportedPdfParseMethod.OCR,  ### 미사용.
             start_page_id=start_page_id,
             end_page_id=end_page_id,
             debug_mode=debug_mode,
-            lang=lang,
+            # lang=lang,  ### 미사용.
             monkeyocr=monkeyocr
         )
         return res

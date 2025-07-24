@@ -11,7 +11,7 @@ from magic_pdf.config.chat_content_type import TaskInstructions
 from magic_pdf.data.data_reader_writer import FileBasedDataWriter, FileBasedDataReader
 from magic_pdf.data.dataset import PDFDataset, ImageDataset
 from magic_pdf.model.doc_analyze_by_custom_model_llm import doc_analyze_llm
-from magic_pdf.model.custom_model import MonkeyOCR
+from magic_pdf.model.monkeyocr import MonkeyOCR
 from magic_pdf.operators.models_llm import LLMInferenceResult
 
 
@@ -162,7 +162,10 @@ def parse_file(
         monkeyocr=monkeyocr,
     )
     # Pipeline processing
-    pipe_result = infer_result.pipe_ocr_mode(image_writer, monkeyocr=monkeyocr)
+    pipe_result = infer_result.pipe_ocr_mode(
+        image_writer=image_writer,
+        monkeyocr=monkeyocr,
+    )
     
     parsing_time = time.time() - start_time
     print(f"Parsing time: {parsing_time:.2f}s")

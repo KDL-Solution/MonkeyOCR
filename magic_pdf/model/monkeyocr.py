@@ -1,16 +1,16 @@
 import os
 import torch
-from transformers import LayoutLMv3ForTokenClassification
-from loguru import logger
 import yaml
-from qwen_vl_utils import process_vision_info
-from PIL import Image
-import requests
-from typing import List, Union
-from openai import OpenAI, AsyncOpenAI
+# import requests
 import io
 import base64
 import asyncio
+from loguru import logger
+# from qwen_vl_utils import process_vision_info
+# from PIL import Image
+# from typing import List, Union
+from openai import OpenAI, AsyncOpenAI
+from transformers import LayoutLMv3ForTokenClassification
 
 from magic_pdf.config.constants import *
 from magic_pdf.config.chat_content_type import LoraType
@@ -26,12 +26,12 @@ class MonkeyOCR:
 
         root_dir = os.path.dirname(current_dir)
 
-        with open(config_path, 'r', encoding='utf-8') as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             self.configs = yaml.load(f, Loader=yaml.FullLoader)
-        logger.info('using configs: {}'.format(self.configs))
+        logger.info("using configs: {}".format(self.configs))
 
-        self.device = self.configs.get('device', 'cpu')
-        logger.info('using device: {}'.format(self.device))
+        self.device = self.configs.get("device", "cpu")
+        logger.info("using device: {}".format(self.device))
 
         bf16_supported = False
         if self.device.startswith("cuda"):
@@ -40,24 +40,24 @@ class MonkeyOCR:
             bf16_supported = True
         
         models_dir = self.configs.get(
-            'models_dir', os.path.join(root_dir, 'model_weight')
+            "models_dir", os.path.join(root_dir, "model_weight")
         )
 
-        logger.info('using models_dir: {}'.format(models_dir))
+        logger.info("using models_dir: {}".format(models_dir))
         if not os.path.exists(models_dir):
             raise FileNotFoundError(
                 f"Model directory '{models_dir}' not found. "
                 "Please run 'python download_model.py' to download the required models."
             )
         
-        self.layout_config = self.configs.get('layout_config')
+        self.layout_config = self.configs.get("layout_config")
         self.layout_model_name = self.layout_config.get(
-            'model', MODEL_NAME.DocLayout_YOLO
+            "model", MODEL_NAME.DocLayout_YOLO
         )
 
         layout_model_path = os.path.join(
             models_dir,
-            self.configs['weights'][self.layout_model_name],
+            self.configs["weights"][self.layout_model_name],
         )
         if not os.path.exists(layout_model_path):
             raise FileNotFoundError(
@@ -70,22 +70,22 @@ class MonkeyOCR:
                 weight=layout_model_path,
                 device=self.device,
             )
-        logger.info(f'layout model loaded: {self.layout_model_name}')
+        logger.info(f"layout model loaded: {self.layout_model_name}")
 
-        layout_reader_config = self.layout_config.get('reader')
-        self.layout_reader_name = layout_reader_config.get('name')
-        if self.layout_reader_name == 'layoutreader':
-            layoutreader_model_dir = os.path.join(models_dir, self.configs['weights'][self.layout_reader_name])
+        layout_reader_config = self.layout_config.get("reader")
+        self.layout_reader_name = layout_reader_config.get("name")
+        if self.layout_reader_name == "layoutreader":
+            layoutreader_model_dir = os.path.join(models_dir, self.configs["weights"][self.layout_reader_name])
             if os.path.exists(layoutreader_model_dir):
                 model = LayoutLMv3ForTokenClassification.from_pretrained(
                     layoutreader_model_dir
                 )
             else:
                 logger.warning(
-                    'local layoutreader model not exists, use online model from huggingface'
+                    "local layoutreader model not exists, use online model from huggingface"
                 )
                 model = LayoutLMv3ForTokenClassification.from_pretrained(
-                    'hantian/layoutreader'
+                    "hantian/layoutreader"
                 )
 
             if bf16_supported:
@@ -93,52 +93,52 @@ class MonkeyOCR:
             else:
                 model.to(self.device).eval()
         else:
-            logger.error('model name not allow')
+            logger.error("model name not allow")
         self.layoutreader_model = model
-        logger.info(f'layoutreader model loaded: {self.layout_reader_name}')
+        logger.info(f"layoutreader model loaded: {self.layout_reader_name}")
 
-        self.chat_config = self.configs.get('chat_config', {})
-        self.chat_backend = self.chat_config.get('backend', 'lmdeploy')
-        backend_config = self.chat_config.get('backend_config', {})
-        backend_config = backend_config.get(self.chat_backend, {})
-        if self.chat_backend == 'lmdeploy':
+        self.chat_config = self.configs.get("chat_config", {})
+        self.backend = self.chat_config.get("backend", "lmdeploy")
+        backend_config = self.chat_config.get("backend_config", {})
+        backend_config = backend_config.get(self.backend, {})
+        if self.backend == "lmdeploy":
             ### 미사용:
-            # logger.info('Use LMDeploy as backend')    
-            # chat_path = backend_config.get('weight_path', None)
+            # logger.info("Use LMDeploy as backend")    
+            # chat_path = backend_config.get("weight_path", None)
             # self.chat_model = MonkeyChat_LMDeploy(chat_path)
             ### : 미사용
             pass
-        elif self.chat_backend == 'vllm':
+        elif self.backend == "vllm":
             ### 미사용:
-            # logger.info('Use vLLM as backend')
-            # chat_path = backend_config.get('weight_path', None)
+            # logger.info("Use vLLM as backend")
+            # chat_path = backend_config.get("weight_path", None)
             # self.chat_model = MonkeyChat_vLLM(chat_path)
             ### : 미사용
             pass
-        elif self.chat_backend == 'vllm_api':
-            logger.info('Use vLLM API as backend')
-            url = backend_config.get('url')
-            model_name = backend_config.get('model_name')
-            lora_config = backend_config.get('loras', {})
-            self.chat_model = MonkeyChat_vLLM_MultiModel_API(
+        elif self.backend == "vllm_api":
+            logger.info("Use vLLM API as backend")
+            url = backend_config.get("url")
+            model_name = backend_config.get("model_name")
+            lora_config = backend_config.get("loras", {})
+            self.chat_model = MonkeyChatvLLMMultiModelAPI(
                 url=url,
                 model_name=model_name,
                 lora_config=lora_config,
             )
-        elif self.chat_backend == 'transformers':
+        elif self.backend == "transformers":
             ### 미사용:
-            # logger.info('Use transformers as backend')
-            # chat_path = backend_config.get('weight_path', None)
-            # batch_size = backend_config.get('batch_size', 5)
+            # logger.info("Use transformers as backend")
+            # chat_path = backend_config.get("weight_path", None)
+            # batch_size = backend_config.get("batch_size", 5)
             # self.chat_model = MonkeyChat_transformers(chat_path, batch_size, device=self.device)
             ### : 미사용
             pass
-        elif self.chat_backend == 'openai_api':
+        elif self.backend == "openai_api":
             ### 미사용:
-            # logger.info('Use API as backend')
-            # url = backend_config.get('url')
-            # model_name = backend_config.get('model_name')
-            # api_key = backend_config.get('api_key', None)
+            # logger.info("Use API as backend")
+            # url = backend_config.get("url")
+            # model_name = backend_config.get("model_name")
+            # api_key = backend_config.get("api_key", None)
             # self.chat_model = MonkeyChat_OpenAIAPI(
             #     url=url,
             #     model_name=model_name,
@@ -148,12 +148,12 @@ class MonkeyOCR:
             pass
         else:
             ### 미사용:
-            # logger.warning('Use LMDeploy as default backend')
+            # logger.warning("Use LMDeploy as default backend")
             # self.chat_model = MonkeyChat_LMDeploy(chat_path)
             ### : 미사용
             pass
-        logger.info(f'VLM loaded: {self.chat_model.model_name}')
-        logger.info(f'Chat backend: {self.chat_backend}')
+        logger.info(f"VLM loaded: {self.chat_model.model_name}")
+        logger.info(f"Chat backend: {self.backend}")
 
 
 ### 미사용:
@@ -167,7 +167,7 @@ class MonkeyOCR:
 #                               "to use MonkeyChat_LMDeploy.")
 #         self.model_name = os.path.basename(model_path)
 #         self.engine_config = self._auto_config_dtype(engine_config, PytorchEngineConfig)
-#         self.pipe = pipeline(model_path, backend_config=self.engine_config, chat_template_config=ChatTemplateConfig('qwen2d5-vl'))
+#         self.pipe = pipeline(model_path, backend_config=self.engine_config, chat_template_config=ChatTemplateConfig("qwen2d5-vl"))
 #         self.gen_config=GenerationConfig(max_new_tokens=4096,do_sample=True,temperature=0,repetition_penalty=1.05)
 
 #     def _auto_config_dtype(self, engine_config=None, PytorchEngineConfig=None):
@@ -203,7 +203,7 @@ class MonkeyOCR:
 #         self.model_name = os.path.basename(model_path)
 #         self.pipe = LLM(model=model_path,
 #                         max_seq_len_to_capture=10240,
-#                         mm_processor_kwargs={'use_fast': True},
+#                         mm_processor_kwargs={"use_fast": True},
 #                         gpu_memory_utilization=self._auto_gpu_mem_ratio(0.48)
 #                     )
 #         self.gen_config = SamplingParams(max_tokens=4096,temperature=0,repetition_penalty=1.05)
@@ -231,7 +231,7 @@ class MonkeyOCR:
 #         return [o.outputs[0].text for o in outputs]
 
 
-class MonkeyChat_vLLM_MultiModel_API:
+class MonkeyChatvLLMMultiModelAPI:
     def __init__(self, url: str, model_name: str, lora_config: dict, api_key: str = "EMPTY"):
         self.model_name = model_name
         self.base_model = MonkeyChat_vLLM_API(
@@ -403,7 +403,7 @@ class MonkeyChat_vLLM_API:
 #         self.max_new_tokens = max_new_tokens
         
 #         if device is None:
-#             self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+#             self.device = "cuda" if torch.cuda.is_available() else "cpu"
 #         else:
 #             self.device = device
         
@@ -421,7 +421,7 @@ class MonkeyChat_vLLM_API:
 #             self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
 #                         model_path,
 #                         torch_dtype=torch.bfloat16 if bf16_supported else torch.float16,
-#                         attn_implementation="flash_attention_2" if self.device.startswith("cuda") else 'sdpa',
+#                         attn_implementation="flash_attention_2" if self.device.startswith("cuda") else "sdpa",
 #                         device_map=self.device,
 #                     )
                 
@@ -489,7 +489,7 @@ class MonkeyChat_vLLM_API:
 #                         logger.error(f"Single processing also failed: {single_e}")
 #                         results.append(f"Error: {str(single_e)}")
             
-#             if self.device == 'cuda':
+#             if self.device == "cuda":
 #                 torch.cuda.empty_cache()
         
 #         return results
@@ -612,7 +612,7 @@ class MonkeyChat_vLLM_API:
 #             return False
     
 #     def img2base64(self, image: Union[str, Image.Image]) -> tuple[str, str]:
-#         if hasattr(image, 'format') and image.format:
+#         if hasattr(image, "format") and image.format:
 #             img_format = image.format
 #         else:
 #             # Default to PNG if format is not specified

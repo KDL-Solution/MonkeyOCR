@@ -1,13 +1,13 @@
 import copy
 import math
-import os
 import re
 import statistics
 import time
 from typing import List
-import fitz
 import torch
 from loguru import logger
+# import os
+# import fitz
 
 from magic_pdf.config.enums import SupportedPdfParseMethod
 from magic_pdf.config.ocr_content_type import BlockType, ContentType
@@ -19,9 +19,7 @@ from magic_pdf.libs.boxbase import (
 from magic_pdf.libs.clean_memory import clean_memory
 from magic_pdf.libs.convert_utils import dict_to_list
 from magic_pdf.libs.hash_utils import compute_md5
-from magic_pdf.libs.pdf_image_tools import cut_image_to_pil_image
 from magic_pdf.model.magic_model import MagicModel
-from magic_pdf.model.sub_modules.model_init import AtomModelSingleton
 from magic_pdf.post_proc.para_split_v3 import para_split
 from magic_pdf.pre_proc.construct_page_dict import ocr_construct_page_component_v2
 from magic_pdf.pre_proc.cut_image import ocr_cut_image_and_table
@@ -33,276 +31,269 @@ from magic_pdf.pre_proc.ocr_span_list_modify import (
     remove_overlaps_min_spans,
     check_chars_is_overlap_in_span,
 )
-from magic_pdf.model.custom_model import MonkeyOCR
+from magic_pdf.model.monkeyocr import MonkeyOCR
+# from magic_pdf.libs.pdf_image_tools import cut_image_to_pil_image
+# from magic_pdf.model.sub_modules.model_init import AtomModelSingleton
 
 
-def __replace_STX_ETX(text_str: str):
-    """Replace \u0002 and \u0003, as these characters become garbled when extracted using pymupdf. In fact, they were originally quotation marks.
-    Drawback: This issue is only observed in English text; it has not been found in Chinese text so far.
+### 미사용:
+# def __replace_STX_ETX(text_str: str):
+#     """Replace \u0002 and \u0003, as these characters become garbled when extracted using pymupdf. In fact, they were originally quotation marks.
+#     Drawback: This issue is only observed in English text; it has not been found in Chinese text so far.
 
-        Args:
-            text_str (str): raw text
+#         Args:
+#             text_str (str): raw text
 
-        Returns:
-            _type_: replaced text
-    """  # noqa: E501
-    if text_str:
-        s = text_str.replace('\u0002', "'")
-        s = s.replace('\u0003', "'")
-        return s
-    return text_str
-
-
-def __replace_0xfffd(text_str: str):
-    """Replace \ufffd, as these characters become garbled when extracted using pymupdf."""
-    if text_str:
-        s = text_str.replace('\ufffd', " ")
-        return s
-    return text_str
+#         Returns:
+#             _type_: replaced text
+#     """  # noqa: E501
+#     if text_str:
+#         s = text_str.replace('\u0002', "'")
+#         s = s.replace('\u0003', "'")
+#         return s
+#     return text_str
 
 
-# Split ligature characters
-def __replace_ligatures(text: str):
-    ligatures = {
-        'ﬁ': 'fi', 'ﬂ': 'fl', 'ﬀ': 'ff', 'ﬃ': 'ffi', 'ﬄ': 'ffl', 'ﬅ': 'ft', 'ﬆ': 'st'
-    }
-    return re.sub('|'.join(map(re.escape, ligatures.keys())), lambda m: ligatures[m.group()], text)
+# def __replace_0xfffd(text_str: str):
+#     """Replace \ufffd, as these characters become garbled when extracted using pymupdf."""
+#     if text_str:
+#         s = text_str.replace('\ufffd', " ")
+#         return s
+#     return text_str
 
 
-def chars_to_content(span):
-    # Check if char in span is empty
-    if len(span['chars']) == 0:
-        pass
-        # span['content'] = ''
-    elif check_chars_is_overlap_in_span(span['chars']):
-        pass
-    else:
-        # First sort chars by x-coordinate of bbox center point
-        span['chars'] = sorted(span['chars'], key=lambda x: (x['bbox'][0] + x['bbox'][2]) / 2)
-
-        # Calculate average char width
-        char_width_sum = sum([char['bbox'][2] - char['bbox'][0] for char in span['chars']])
-        char_avg_width = char_width_sum / len(span['chars'])
-
-        content = ''
-        for char in span['chars']:
-
-            # If distance between next char's x0 and previous char's x1 exceeds 0.25 char width, insert a space
-            char1 = char
-            char2 = span['chars'][span['chars'].index(char) + 1] if span['chars'].index(char) + 1 < len(span['chars']) else None
-            if char2 and char2['bbox'][0] - char1['bbox'][2] > char_avg_width * 0.25 and char['c'] != ' ' and char2['c'] != ' ':
-                content += f"{char['c']} "
-            else:
-                content += char['c']
-
-        content = __replace_ligatures(content)
-        span['content'] = __replace_0xfffd(content)
-
-    del span['chars']
+# def __replace_ligatures(text: str):
+#     """Split ligature characters
+#     """
+#     ligatures = {
+#         'ﬁ': 'fi', 'ﬂ': 'fl', 'ﬀ': 'ff', 'ﬃ': 'ffi', 'ﬄ': 'ffl', 'ﬅ': 'ft', 'ﬆ': 'st'
+#     }
+#     return re.sub('|'.join(map(re.escape, ligatures.keys())), lambda m: ligatures[m.group()], text)
 
 
-LINE_STOP_FLAG = ('.', '!', '?', '。', '！', '？', ')', '）', '"', '”', ':', '：', ';', '；', ']', '】', '}', '}', '>', '》', '、', ',', '，', '-', '—', '–',)
-LINE_START_FLAG = ('(', '（', '"', '“', '【', '{', '《', '<', '「', '『', '【', '[',)
+# def chars_to_content(span):
+#     # Check if char in span is empty
+#     if len(span['chars']) == 0:
+#         pass
+#         # span['content'] = ''
+#     elif check_chars_is_overlap_in_span(span['chars']):
+#         pass
+#     else:
+#         # First sort chars by x-coordinate of bbox center point
+#         span['chars'] = sorted(span['chars'], key=lambda x: (x['bbox'][0] + x['bbox'][2]) / 2)
+
+#         # Calculate average char width
+#         char_width_sum = sum([char['bbox'][2] - char['bbox'][0] for char in span['chars']])
+#         char_avg_width = char_width_sum / len(span['chars'])
+
+#         content = ''
+#         for char in span['chars']:
+
+#             # If distance between next char's x0 and previous char's x1 exceeds 0.25 char width, insert a space
+#             char1 = char
+#             char2 = span['chars'][span['chars'].index(char) + 1] if span['chars'].index(char) + 1 < len(span['chars']) else None
+#             if char2 and char2['bbox'][0] - char1['bbox'][2] > char_avg_width * 0.25 and char['c'] != ' ' and char2['c'] != ' ':
+#                 content += f"{char['c']} "
+#             else:
+#                 content += char['c']
+
+#         content = __replace_ligatures(content)
+#         span['content'] = __replace_0xfffd(content)
+
+#     del span['chars']
 
 
-def fill_char_in_spans(spans, all_chars):
-
-    # Simple top-to-bottom sorting
-    spans = sorted(spans, key=lambda x: x['bbox'][1])
-
-    for char in all_chars:
-        # Skip chars with invalid bbox
-        # x1, y1, x2, y2 = char['bbox']
-        # if abs(x1 - x2) <= 0.01 or abs(y1 - y2) <= 0.01:
-        #     continue
-
-        for span in spans:
-            if calculate_char_in_span(char['bbox'], span['bbox'], char['c']):
-                span['chars'].append(char)
-                break
-
-    empty_spans = []
-
-    for span in spans:
-        chars_to_content(span)
-        # Some spans have no text but have one or two empty placeholders, filter by width/height and content length
-        if len(span['content']) * span['height'] < span['width'] * 0.5:
-            # logger.info(f"maybe empty span: {len(span['content'])}, {span['height']}, {span['width']}")
-            empty_spans.append(span)
-        del span['height'], span['width']
-    return empty_spans
+# LINE_STOP_FLAG = ('.', '!', '?', '。', '！', '？', ')', '）', '"', '”', ':', '：', ';', '；', ']', '】', '}', '}', '>', '》', '、', ',', '，', '-', '—', '–',)
+# LINE_START_FLAG = ('(', '（', '"', '“', '【', '{', '《', '<', '「', '『', '【', '[',)
 
 
-# Use more robust center point coordinate judgment
-def calculate_char_in_span(char_bbox, span_bbox, char, span_height_radio=0.33):
-    char_center_x = (char_bbox[0] + char_bbox[2]) / 2
-    char_center_y = (char_bbox[1] + char_bbox[3]) / 2
-    span_center_y = (span_bbox[1] + span_bbox[3]) / 2
-    span_height = span_bbox[3] - span_bbox[1]
+# def fill_char_in_spans(spans, all_chars):
+#     # Simple top-to-bottom sorting
+#     spans = sorted(spans, key=lambda x: x['bbox'][1])
 
-    if (
-        span_bbox[0] < char_center_x < span_bbox[2]
-        and span_bbox[1] < char_center_y < span_bbox[3]
-        and abs(char_center_y - span_center_y) < span_height * span_height_radio
-    ):
-        return True
-    else:
-        if char in LINE_STOP_FLAG:
-            if (
-                (span_bbox[2] - span_height) < char_bbox[0] < span_bbox[2]
-                and char_center_x > span_bbox[0]
-                and span_bbox[1] < char_center_y < span_bbox[3]
-                and abs(char_center_y - span_center_y) < span_height * span_height_radio
-            ):
-                return True
-        elif char in LINE_START_FLAG:
-            if (
-                span_bbox[0] < char_bbox[2] < (span_bbox[0] + span_height)
-                and char_center_x < span_bbox[2]
-                and span_bbox[1] < char_center_y < span_bbox[3]
-                and abs(char_center_y - span_center_y) < span_height * span_height_radio
-            ):
-                return True
-        else:
-            return False
+#     for char in all_chars:
+#         # Skip chars with invalid bbox
+#         # x1, y1, x2, y2 = char['bbox']
+#         # if abs(x1 - x2) <= 0.01 or abs(y1 - y2) <= 0.01:
+#         #     continue
+
+#         for span in spans:
+#             if calculate_char_in_span(char['bbox'], span['bbox'], char['c']):
+#                 span['chars'].append(char)
+#                 break
+
+#     empty_spans = []
+
+#     for span in spans:
+#         chars_to_content(span)
+#         # Some spans have no text but have one or two empty placeholders, filter by width/height and content length
+#         if len(span['content']) * span['height'] < span['width'] * 0.5:
+#             # logger.info(f"maybe empty span: {len(span['content'])}, {span['height']}, {span['width']}")
+#             empty_spans.append(span)
+#         del span['height'], span['width']
+#     return empty_spans
 
 
-def remove_tilted_line(text_blocks):
-    for block in text_blocks:
-        remove_lines = []
-        for line in block['lines']:
-            cosine, sine = line['dir']
-            # Calculate radian value
-            angle_radians = math.atan2(sine, cosine)
-            # Convert radian value to degree value
-            angle_degrees = math.degrees(angle_radians)
-            if 2 < abs(angle_degrees) < 88:
-                remove_lines.append(line)
-        for line in remove_lines:
-            block['lines'].remove(line)
+# def calculate_char_in_span(char_bbox, span_bbox, char, span_height_radio=0.33):
+#     """Use more robust center point coordinate judgment
+#     """
+#     char_center_x = (char_bbox[0] + char_bbox[2]) / 2
+#     char_center_y = (char_bbox[1] + char_bbox[3]) / 2
+#     span_center_y = (span_bbox[1] + span_bbox[3]) / 2
+#     span_height = span_bbox[3] - span_bbox[1]
+
+#     if (
+#         span_bbox[0] < char_center_x < span_bbox[2]
+#         and span_bbox[1] < char_center_y < span_bbox[3]
+#         and abs(char_center_y - span_center_y) < span_height * span_height_radio
+#     ):
+#         return True
+#     else:
+#         if char in LINE_STOP_FLAG:
+#             if (
+#                 (span_bbox[2] - span_height) < char_bbox[0] < span_bbox[2]
+#                 and char_center_x > span_bbox[0]
+#                 and span_bbox[1] < char_center_y < span_bbox[3]
+#                 and abs(char_center_y - span_center_y) < span_height * span_height_radio
+#             ):
+#                 return True
+#         elif char in LINE_START_FLAG:
+#             if (
+#                 span_bbox[0] < char_bbox[2] < (span_bbox[0] + span_height)
+#                 and char_center_x < span_bbox[2]
+#                 and span_bbox[1] < char_center_y < span_bbox[3]
+#                 and abs(char_center_y - span_center_y) < span_height * span_height_radio
+#             ):
+#                 return True
+#         else:
+#             return False
 
 
-def txt_spans_extract_v2(pdf_page, spans, all_bboxes, all_discarded_blocks, lang):
-
-    # text_blocks_raw = pdf_page.get_text('rawdict', flags=fitz.TEXT_PRESERVE_WHITESPACE | fitz.TEXT_MEDIABOX_CLIP)['blocks']
-
-
-    #text_blocks_raw = pdf_page.get_text('rawdict', flags=fitz.TEXT_PRESERVE_LIGATURES | fitz.TEXT_PRESERVE_WHITESPACE | fitz.TEXT_MEDIABOX_CLIP)['blocks']
-
-
-    text_blocks_raw = pdf_page.get_text('rawdict', flags=fitz.TEXTFLAGS_TEXT)['blocks']
-    # text_blocks = pdf_page.get_text('dict', flags=fitz.TEXTFLAGS_TEXT)['blocks']
-
-
-    remove_tilted_line(text_blocks_raw)
-
-    all_pymu_chars = []
-    for block in text_blocks_raw:
-        for line in block['lines']:
-            cosine, sine = line['dir']
-            if abs(cosine) < 0.9 or abs(sine) > 0.1:
-                continue
-            for span in line['spans']:
-                all_pymu_chars.extend(span['chars'])
-
-    # Calculate median height of all spans
-    span_height_list = []
-    for span in spans:
-        if span['type'] in [ContentType.InterlineEquation, ContentType.Image, ContentType.Table]:
-            continue
-        span_height = span['bbox'][3] - span['bbox'][1]
-        span['height'] = span_height
-        span['width'] = span['bbox'][2] - span['bbox'][0]
-        span_height_list.append(span_height)
-    if len(span_height_list) == 0:
-        return spans
-    else:
-        median_span_height = statistics.median(span_height_list)
-
-    useful_spans = []
-    unuseful_spans = []
-    # Two characteristics of vertical spans: 1. Height exceeds multiple lines 2. Aspect ratio exceeds certain value
-    vertical_spans = []
-    for span in spans:
-        if span['type'] in [ContentType.InterlineEquation, ContentType.Image, ContentType.Table]:
-            continue
-        for block in all_bboxes + all_discarded_blocks:
-            if block[7] in [BlockType.ImageBody, BlockType.TableBody, BlockType.InterlineEquation]:
-                continue
-            if calculate_overlap_area_in_bbox1_area_ratio(span['bbox'], block[0:4]) > 0.5:
-                if span['height'] > median_span_height * 3 and span['height'] > span['width'] * 3:
-                    vertical_spans.append(span)
-                elif block in all_bboxes:
-                    useful_spans.append(span)
-                else:
-                    unuseful_spans.append(span)
-
-                break
-
-    if len(vertical_spans) > 0:
-        text_blocks = pdf_page.get_text('dict', flags=fitz.TEXTFLAGS_TEXT)['blocks']
-        all_pymu_lines = []
-        for block in text_blocks:
-            for line in block['lines']:
-                all_pymu_lines.append(line)
-
-        for pymu_line in all_pymu_lines:
-            for span in vertical_spans:
-                if calculate_overlap_area_in_bbox1_area_ratio(pymu_line['bbox'], span['bbox']) > 0.5:
-                    for pymu_span in pymu_line['spans']:
-                        span['content'] += pymu_span['text']
-                    break
-
-        for span in vertical_spans:
-            if len(span['content']) == 0:
-                spans.remove(span)
-
-    new_spans = []
-
-    for span in useful_spans + unuseful_spans:
-        if span['type'] in [ContentType.Text]:
-            span['chars'] = []
-            new_spans.append(span)
-
-    empty_spans = fill_char_in_spans(new_spans, all_pymu_chars)
-
-    if len(empty_spans) > 0:
-        atom_model_manager = AtomModelSingleton()
-        ocr_model = atom_model_manager.get_atom_model(
-            atom_model_name='ocr',
-            ocr_show_log=False,
-            det_db_box_thresh=0.3,
-            lang=lang
-        )
-
-        for span in empty_spans:
-            span_img = cut_image_to_pil_image(span['bbox'], pdf_page, mode='cv2')
-            ocr_res = ocr_model.ocr(span_img, det=False)
-            if ocr_res and len(ocr_res) > 0:
-                if len(ocr_res[0]) > 0:
-                    ocr_text, ocr_score = ocr_res[0][0]
-                    # logger.info(f"ocr_text: {ocr_text}, ocr_score: {ocr_score}")
-                    if ocr_score > 0.5 and len(ocr_text) > 0:
-                        span['content'] = ocr_text
-                        span['score'] = ocr_score
-                    else:
-                        spans.remove(span)
-
-    return spans
+# def remove_tilted_line(text_blocks):
+#     for block in text_blocks:
+#         remove_lines = []
+#         for line in block['lines']:
+#             cosine, sine = line['dir']
+#             # Calculate radian value
+#             angle_radians = math.atan2(sine, cosine)
+#             # Convert radian value to degree value
+#             angle_degrees = math.degrees(angle_radians)
+#             if 2 < abs(angle_degrees) < 88:
+#                 remove_lines.append(line)
+#         for line in remove_lines:
+#             block['lines'].remove(line)
 
 
-def do_predict(boxes: List[List[int]], model) -> List[int]:
-    from magic_pdf.model.sub_modules.reading_oreder.layoutreader.helpers import (
-        boxes2inputs, parse_logits, prepare_inputs)
-
-    inputs = boxes2inputs(boxes)
-    inputs = prepare_inputs(inputs, model)
-    logits = model(**inputs).logits.cpu().squeeze(0)
-    return parse_logits(logits, len(boxes))
+# def txt_spans_extract_v2(pdf_page, spans, all_bboxes, all_discarded_blocks, lang):
+#     # text_blocks_raw = pdf_page.get_text('rawdict', flags=fitz.TEXT_PRESERVE_WHITESPACE | fitz.TEXT_MEDIABOX_CLIP)['blocks']
 
 
-def cal_block_index(fix_blocks, sorted_bboxes):
+#     #text_blocks_raw = pdf_page.get_text('rawdict', flags=fitz.TEXT_PRESERVE_LIGATURES | fitz.TEXT_PRESERVE_WHITESPACE | fitz.TEXT_MEDIABOX_CLIP)['blocks']
 
+
+#     text_blocks_raw = pdf_page.get_text('rawdict', flags=fitz.TEXTFLAGS_TEXT)['blocks']
+#     # text_blocks = pdf_page.get_text('dict', flags=fitz.TEXTFLAGS_TEXT)['blocks']
+
+#     remove_tilted_line(text_blocks_raw)
+
+#     all_pymu_chars = []
+#     for block in text_blocks_raw:
+#         for line in block['lines']:
+#             cosine, sine = line['dir']
+#             if abs(cosine) < 0.9 or abs(sine) > 0.1:
+#                 continue
+#             for span in line['spans']:
+#                 all_pymu_chars.extend(span['chars'])
+
+#     # Calculate median height of all spans
+#     span_height_list = []
+#     for span in spans:
+#         if span['type'] in [ContentType.InterlineEquation, ContentType.Image, ContentType.Table]:
+#             continue
+#         span_height = span['bbox'][3] - span['bbox'][1]
+#         span['height'] = span_height
+#         span['width'] = span['bbox'][2] - span['bbox'][0]
+#         span_height_list.append(span_height)
+#     if len(span_height_list) == 0:
+#         return spans
+#     else:
+#         median_span_height = statistics.median(span_height_list)
+
+#     useful_spans = []
+#     unuseful_spans = []
+#     # Two characteristics of vertical spans: 1. Height exceeds multiple lines 2. Aspect ratio exceeds certain value
+#     vertical_spans = []
+#     for span in spans:
+#         if span['type'] in [ContentType.InterlineEquation, ContentType.Image, ContentType.Table]:
+#             continue
+#         for block in all_bboxes + all_discarded_blocks:
+#             if block[7] in [BlockType.ImageBody, BlockType.TableBody, BlockType.InterlineEquation]:
+#                 continue
+#             if calculate_overlap_area_in_bbox1_area_ratio(span['bbox'], block[0:4]) > 0.5:
+#                 if span['height'] > median_span_height * 3 and span['height'] > span['width'] * 3:
+#                     vertical_spans.append(span)
+#                 elif block in all_bboxes:
+#                     useful_spans.append(span)
+#                 else:
+#                     unuseful_spans.append(span)
+
+#                 break
+
+#     if len(vertical_spans) > 0:
+#         text_blocks = pdf_page.get_text('dict', flags=fitz.TEXTFLAGS_TEXT)['blocks']
+#         all_pymu_lines = []
+#         for block in text_blocks:
+#             for line in block['lines']:
+#                 all_pymu_lines.append(line)
+
+#         for pymu_line in all_pymu_lines:
+#             for span in vertical_spans:
+#                 if calculate_overlap_area_in_bbox1_area_ratio(pymu_line['bbox'], span['bbox']) > 0.5:
+#                     for pymu_span in pymu_line['spans']:
+#                         span['content'] += pymu_span['text']
+#                     break
+
+#         for span in vertical_spans:
+#             if len(span['content']) == 0:
+#                 spans.remove(span)
+
+#     new_spans = []
+
+#     for span in useful_spans + unuseful_spans:
+#         if span['type'] in [ContentType.Text]:
+#             span['chars'] = []
+#             new_spans.append(span)
+
+#     empty_spans = fill_char_in_spans(new_spans, all_pymu_chars)
+
+#     if len(empty_spans) > 0:
+#         atom_model_manager = AtomModelSingleton()
+#         ocr_model = atom_model_manager.get_atom_model(
+#             atom_model_name='ocr',
+#             ocr_show_log=False,
+#             det_db_box_thresh=0.3,
+#             lang=lang
+#         )
+#         print("A" * 100)
+#         print(ocr_model)
+
+#         for span in empty_spans:
+#             span_img = cut_image_to_pil_image(span['bbox'], pdf_page, mode='cv2')
+#             ocr_res = ocr_model.ocr(span_img, det=False)
+#             if ocr_res and len(ocr_res) > 0:
+#                 if len(ocr_res[0]) > 0:
+#                     ocr_text, ocr_score = ocr_res[0][0]
+#                     # logger.info(f"ocr_text: {ocr_text}, ocr_score: {ocr_score}")
+#                     if ocr_score > 0.5 and len(ocr_text) > 0:
+#                         span['content'] = ocr_text
+#                         span['score'] = ocr_score
+#                     else:
+#                         spans.remove(span)
+#     return spans
+### : 미사용
+
+
+def _calculate_block_index(fix_blocks, sorted_bboxes):
     if sorted_bboxes is not None:
 
         for block in fix_blocks:
@@ -362,13 +353,11 @@ def cal_block_index(fix_blocks, sorted_bboxes):
     return fix_blocks
 
 
-def insert_lines_into_block(block_bbox, line_height, page_w, page_h):
-
+def _insert_lines_into_block(block_bbox, line_height, page_w, page_h):
     x0, y0, x1, y1 = block_bbox
 
     block_height = y1 - y0
     block_weight = x1 - x0
-
 
     if line_height * 2 < block_height:
         if (
@@ -389,9 +378,7 @@ def insert_lines_into_block(block_bbox, line_height, page_w, page_h):
                     lines = 2
                     line_height = (y1 - y0) / lines
 
-
         current_y = y0
-
 
         lines_positions = []
 
@@ -404,11 +391,33 @@ def insert_lines_into_block(block_bbox, line_height, page_w, page_h):
         return [[x0, y0, x1, y1]]
 
 
-def sort_lines_by_model(fix_blocks, page_w, page_h, line_height, monkeyocr: MonkeyOCR):
+def predict_reading_order(
+    boxes: List[List[int]],
+    model,
+) -> List[int]:
+    from magic_pdf.model.sub_modules.reading_oreder.layoutreader.helpers import (
+        boxes2inputs,
+        parse_logits,
+        prepare_inputs,
+    )
+
+    inputs = boxes2inputs(boxes)
+    inputs = prepare_inputs(inputs, model)
+    logits = model(**inputs).logits.cpu().squeeze(0)
+    return parse_logits(logits, len(boxes))
+
+
+def sort(
+    fix_blocks,
+    page_w,
+    page_h,
+    line_height,
+    monkeyocr: MonkeyOCR,
+):
     page_line_list = []
 
     def add_lines_to_block(b):
-        line_bboxes = insert_lines_into_block(b['bbox'], line_height, page_w, page_h)
+        line_bboxes = _insert_lines_into_block(b['bbox'], line_height, page_w, page_h)
         b['lines'] = []
         for line_bbox in line_bboxes:
             b['lines'].append({'bbox': line_bbox, 'spans': []})
@@ -471,11 +480,11 @@ def sort_lines_by_model(fix_blocks, page_w, page_h, line_height, monkeyocr: Monk
             1000 >= right >= left >= 0 and 1000 >= bottom >= top >= 0
         ), f'Invalid box. right: {right}, left: {left}, bottom: {bottom}, top: {top}'  # noqa: E126, E121
         boxes.append([left, top, right, bottom])
+
     model = monkeyocr.layoutreader_model
     with torch.no_grad():
-        orders = do_predict(boxes, model)
+        orders = predict_reading_order(boxes, model)
     sorted_bboxes = [page_line_list[i] for i in orders]
-
     return sorted_bboxes
 
 
@@ -526,7 +535,7 @@ def process_block_list(blocks, body_type, block_type):
     }
 
 
-def revert_group_blocks(blocks):
+def _revert_group_blocks(blocks):
     image_groups = {}
     table_groups = {}
     new_blocks = []
@@ -553,7 +562,7 @@ def revert_group_blocks(blocks):
     return new_blocks
 
 
-def remove_outside_spans(spans, all_bboxes, all_discarded_blocks):
+def _remove_outside_spans(spans, all_bboxes, all_discarded_blocks):
     def get_block_bboxes(blocks, block_type_list):
         return [block[0:4] for block in blocks if block[7] in block_type_list]
 
@@ -596,7 +605,14 @@ def remove_outside_spans(spans, all_bboxes, all_discarded_blocks):
 
 
 def parse_page_core(
-    page_doc: PageableData, magic_model, page_id, pdf_bytes_md5, imageWriter, parse_mode, lang, monkeyocr: MonkeyOCR,
+    page_doc: PageableData,
+    magic_model,
+    page_id,
+    pdf_bytes_md5,
+    imageWriter,
+    # parse_mode,  ### 미사용.
+    # lang,   ### 미사용.
+    monkeyocr: MonkeyOCR,
 ):
     need_drop = False
     drop_reason = []
@@ -711,19 +727,25 @@ def parse_page_core(
 
     spans = magic_model.get_all_spans(page_id)
 
-    spans = remove_outside_spans(spans, all_bboxes, all_discarded_blocks)
+    spans = _remove_outside_spans(spans, all_bboxes, all_discarded_blocks)
 
     spans, dropped_spans_by_confidence = remove_overlaps_low_confidence_spans(spans)
     spans, dropped_spans_by_span_overlap = remove_overlaps_min_spans(spans)
 
-    if parse_mode == SupportedPdfParseMethod.TXT:
-
-        spans = txt_spans_extract_v2(page_doc, spans, all_bboxes, all_discarded_blocks, lang)
-
-    elif parse_mode == SupportedPdfParseMethod.OCR:
-        pass
-    else:
-        raise Exception('parse_mode must be txt or ocr')
+    ### 미사용:
+    # if parse_mode == SupportedPdfParseMethod.TXT:
+    #     spans = txt_spans_extract_v2(
+    #         page_doc,
+    #         spans,
+    #         all_bboxes,
+    #         all_discarded_blocks,
+    #         lang,
+    #     )
+    # elif parse_mode == SupportedPdfParseMethod.OCR:
+    #     pass
+    # else:
+    #     raise Exception('parse_mode must be txt or ocr')
+    ### : 미사용
 
     discarded_block_with_spans, spans = fill_spans_in_blocks(
         all_discarded_blocks, spans, 0.4
@@ -757,11 +779,17 @@ def parse_page_core(
 
     line_height = get_line_height(fix_blocks)
 
-    sorted_bboxes = sort_lines_by_model(fix_blocks, page_w, page_h, line_height, monkeyocr)
+    sorted_bboxes = sort(
+        fix_blocks,
+        page_w,
+        page_h,
+        line_height,
+        monkeyocr,
+    )
 
-    fix_blocks = cal_block_index(fix_blocks, sorted_bboxes)
+    fix_blocks = _calculate_block_index(fix_blocks, sorted_bboxes)
 
-    fix_blocks = revert_group_blocks(fix_blocks)
+    fix_blocks = _revert_group_blocks(fix_blocks)
 
     sorted_blocks = sorted(fix_blocks, key=lambda b: b['index'])
 
@@ -792,12 +820,12 @@ def pdf_parse_union(
     model_list,
     dataset: Dataset,
     imageWriter,
-    parse_mode,
+    # parse_mode,  ### 미사용.
     monkeyocr: MonkeyOCR,
     start_page_id=0,
     end_page_id=None,
     debug_mode=False,
-    lang=None,
+    # lang=None,  ### 미사용.
 ):
 
     pdf_bytes_md5 = compute_md5(dataset.data_bits())
@@ -829,7 +857,14 @@ def pdf_parse_union(
 
         if start_page_id <= page_id <= end_page_id:
             page_info = parse_page_core(
-                page, magic_model, page_id, pdf_bytes_md5, imageWriter, parse_mode, lang, monkeyocr
+                page,
+                magic_model,
+                page_id,
+                pdf_bytes_md5,
+                imageWriter,
+                # parse_mode,
+                # lang,
+                monkeyocr,
             )
         else:
             page_info = page.get_page_info()
@@ -848,11 +883,4 @@ def pdf_parse_union(
     }
 
     clean_memory(monkeyocr.device)
-
     return new_pdf_info_dict
-
-
-if __name__ == '__main__':
-    pass
-if __name__ == '__main__':
-    pass

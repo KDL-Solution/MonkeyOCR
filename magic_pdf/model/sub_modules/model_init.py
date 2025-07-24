@@ -2,8 +2,11 @@ import torch
 from loguru import logger
 
 from magic_pdf.config.constants import MODEL_NAME
-from magic_pdf.model.model_list import AtomicModel
 from magic_pdf.model.sub_modules.layout.doclayout_yolo.DocLayoutYOLO import DocLayoutYOLOModel
+
+
+class AtomicModel:
+    Layout = "layout"
 
 
 def doclayout_yolo_model_init(weight, device='cpu'):

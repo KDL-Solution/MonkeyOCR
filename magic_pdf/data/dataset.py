@@ -1,11 +1,10 @@
 import os
+import fitz
 from abc import ABC, abstractmethod
 from typing import Callable, Iterator
-
-import fitz
 from loguru import logger
 
-from magic_pdf.config.enums import SupportedPdfParseMethod
+# from magic_pdf.config.enums import SupportedPdfParseMethod
 from magic_pdf.data.schemas import PageInfo
 from magic_pdf.data.utils import fitz_page_to_image
 from magic_pdf.filter import classify
@@ -69,14 +68,14 @@ class Dataset(ABC):
         """Yield the page data."""
         pass
 
-    @abstractmethod
-    def supported_methods(self) -> list[SupportedPdfParseMethod]:
-        """The methods that this dataset support.
+    # @abstractmethod
+    # def supported_methods(self) -> list[SupportedPdfParseMethod]:
+    #     """The methods that this dataset support.
 
-        Returns:
-            list[SupportedPdfParseMethod]: The supported methods, Valid methods are: OCR, TXT
-        """
-        pass
+    #     Returns:
+    #         list[SupportedPdfParseMethod]: The supported methods, Valid methods are: OCR, TXT
+    #     """
+    #     pass
 
     @abstractmethod
     def data_bits(self) -> bytes:
@@ -117,14 +116,14 @@ class Dataset(ABC):
         """
         pass
 
-    @abstractmethod
-    def classify(self) -> SupportedPdfParseMethod:
-        """classify the dataset 
+    # @abstractmethod
+    # def classify(self) -> SupportedPdfParseMethod:
+    #     """classify the dataset 
 
-        Returns:
-            SupportedPdfParseMethod: _description_
-        """
-        pass
+    #     Returns:
+    #         SupportedPdfParseMethod: _description_
+    #     """
+    #     pass
 
     @abstractmethod
     def clone(self):
@@ -159,13 +158,13 @@ class PDFDataset(Dataset):
         """Yield the page doc object."""
         return iter(self._pages)
 
-    def supported_methods(self) -> list[SupportedPdfParseMethod]:
-        """The method supported by this dataset.
+    # def supported_methods(self) -> list[SupportedPdfParseMethod]:
+    #     """The method supported by this dataset.
 
-        Returns:
-            list[SupportedPdfParseMethod]: the supported methods
-        """
-        return [SupportedPdfParseMethod.OCR, SupportedPdfParseMethod.TXT]
+    #     Returns:
+    #         list[SupportedPdfParseMethod]: the supported methods
+    #     """
+    #     return [SupportedPdfParseMethod.OCR, SupportedPdfParseMethod.TXT]
 
     def data_bits(self) -> bytes:
         """The pdf bits used to create this dataset."""
@@ -208,13 +207,13 @@ class PDFDataset(Dataset):
             kwargs['lang'] = self._lang
         return proc(self, *args, **kwargs)
 
-    def classify(self) -> SupportedPdfParseMethod:
-        """classify the dataset 
+    # def classify(self) -> SupportedPdfParseMethod:
+    #     """classify the dataset 
 
-        Returns:
-            SupportedPdfParseMethod: _description_
-        """
-        return classify(self._data_bits)
+    #     Returns:
+    #         SupportedPdfParseMethod: _description_
+    #     """
+    #     return classify(self._data_bits)
 
     def clone(self):
         """clone this dataset
@@ -243,13 +242,13 @@ class ImageDataset(Dataset):
         """Yield the page object."""
         return iter(self._pages)
 
-    def supported_methods(self):
-        """The method supported by this dataset.
+    # def supported_methods(self):
+    #     """The method supported by this dataset.
 
-        Returns:
-            list[SupportedPdfParseMethod]: the supported methods
-        """
-        return [SupportedPdfParseMethod.OCR]
+    #     Returns:
+    #         list[SupportedPdfParseMethod]: the supported methods
+    #     """
+    #     return [SupportedPdfParseMethod.OCR]
 
     def data_bits(self) -> bytes:
         """The pdf bits used to create this dataset."""
@@ -289,13 +288,13 @@ class ImageDataset(Dataset):
         """
         return proc(self, *args, **kwargs)
 
-    def classify(self) -> SupportedPdfParseMethod:
-        """classify the dataset 
+    # def classify(self) -> SupportedPdfParseMethod:
+    #     """classify the dataset 
 
-        Returns:
-            SupportedPdfParseMethod: _description_
-        """
-        return SupportedPdfParseMethod.OCR
+    #     Returns:
+    #         SupportedPdfParseMethod: _description_
+    #     """
+    #     return SupportedPdfParseMethod.OCR
 
     def clone(self):
         """clone this dataset

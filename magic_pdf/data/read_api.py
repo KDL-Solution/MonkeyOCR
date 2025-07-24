@@ -5,10 +5,16 @@ import shutil
 from pathlib import Path
 
 from magic_pdf.config.exceptions import EmptyData, InvalidParams
-from magic_pdf.data.data_reader_writer import (FileBasedDataReader,
-                                               MultiBucketS3DataReader)
+from magic_pdf.data.data_reader_writer import (
+    FileBasedDataReader,
+    MultiBucketS3DataReader,
+)
 from magic_pdf.data.dataset import ImageDataset, PDFDataset
-from magic_pdf.utils.office_to_pdf import convert_file_to_pdf, ConvertToPdfError
+from magic_pdf.utils.office_to_pdf import (
+    convert_file_to_pdf,
+    ConvertToPdfError,
+)
+
 
 def read_jsonl(
     s3_path_or_local: str, s3_client: MultiBucketS3DataReader | None = None
@@ -73,6 +79,7 @@ def read_local_pdfs(path: str) -> list[PDFDataset]:
         bits = reader.read(path)
         return [PDFDataset(bits)]
 
+
 def read_local_office(path: str) -> list[PDFDataset]:
     """Read ms-office file (ppt, pptx, doc, docx) from path or directory.
 
@@ -115,6 +122,7 @@ def read_local_office(path: str) -> list[PDFDataset]:
         ret.append(PDFDataset(reader.read(pdf_fn)))
     shutil.rmtree(temp_dir)
     return ret
+
 
 def read_local_images(path: str, suffixes: list[str]=['.png', '.jpg']) -> list[ImageDataset]:
     """Read images from path or directory.

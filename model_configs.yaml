@@ -1,6 +1,7 @@
 device: cuda # cuda / cpu / mps (using `transformers` as backend)
 weights:
-  doclayout_yolo: Structure/doclayout_yolo_docstructbench_imgsz1280_2501.pt # or Structure/layout_zh.pt
+  doclayout_yolo: Structure/doclayout_yolo_docstructbench_imgsz1280_2501.pt
+  # doclayout_yolo: layout_zh.pt
   layoutreader: Relation
 models_dir: model_weight
 layout_config: 
@@ -11,20 +12,20 @@ chat_config:
   backend: vllm_api
   backend_config:
     vllm_api:
-      # url: http://192.168.20.58:9800/v1
-      # model_name: Qwen2.5-VL-7B-Instruct
-      url: http://192.168.20.62:9062/v1
-      model_name: Qwen2.5-VL-72B-Instruct
-      # loras:
-      #     table_image_otsl: table_image_otsl  
-    openai_api:
-      url: https://api.openai.com/v1
-      model_name: gpt-4.1
-      api_key: sk-xxx
-    lmdeploy:
-      weight_path: Recognition
-    vllm:
-      weight_path: Recognition
-    transformers:
-      weight_path: Recognition
-      batch_size: 10
+      url: http://192.168.20.58:9800/v1
+      model_name: Qwen2.5-VL-7B-Instruct
+      # url: http://192.168.20.62:9062/v1
+      # model_name: Qwen2.5-VL-72B-Instruct
+      loras:
+          table_image_otsl: table_image_otsl  
+    # openai_api:
+    #   url: https://api.openai.com/v1
+    #   model_name: gpt-4.1
+    #   api_key: sk-xxx
+    # lmdeploy:
+    #   weight_path: Recognition
+    # vllm:
+    #   weight_path: Recognition
+    # transformers:
+    #   weight_path: Recognition
+    #   batch_size: 10

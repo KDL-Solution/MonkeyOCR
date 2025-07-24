@@ -1,2 +1,0 @@
-class AtomicModel:
-    Layout = "layout"

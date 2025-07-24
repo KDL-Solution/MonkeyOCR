@@ -21,7 +21,7 @@ import zipfile
 from loguru import logger
 import time
 
-from magic_pdf.model.custom_model import MonkeyOCR
+from magic_pdf.model.monkeyocr import MonkeyOCR
 from magic_pdf.data.data_reader_writer import FileBasedDataWriter
 from parse import single_task_recognition, parse_pdf
 import uvicorn

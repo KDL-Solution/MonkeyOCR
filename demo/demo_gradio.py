@@ -12,7 +12,7 @@ import uuid
 from magic_pdf.data.data_reader_writer import FileBasedDataWriter, FileBasedDataReader
 from magic_pdf.data.dataset import PDFDataset, ImageDataset
 from magic_pdf.model.doc_analyze_by_custom_model_llm import doc_analyze_llm
-from magic_pdf.model.custom_model import MonkeyOCR
+from magic_pdf.model.monkeyocr import MonkeyOCR
 from PIL import Image
 from loguru import logger
 

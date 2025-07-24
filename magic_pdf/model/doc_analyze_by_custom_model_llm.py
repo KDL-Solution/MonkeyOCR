@@ -5,7 +5,7 @@ from magic_pdf.data.dataset import Dataset
 from magic_pdf.libs.clean_memory import clean_memory
 from magic_pdf.operators.models_llm import LLMInferenceResult
 from magic_pdf.model.batch_analyze_llm import InferenceBatch
-from magic_pdf.model.custom_model import MonkeyOCR
+from magic_pdf.model.monkeyocr import MonkeyOCR
 
 
 def doc_analyze_llm(
@@ -18,7 +18,7 @@ def doc_analyze_llm(
     end_page_id = end_page_id if end_page_id else len(dataset) - 1
 
     device = monkeyocr.device
-    backend = monkeyocr.chat_backend
+    backend = monkeyocr.backend
 
     batch_model = InferenceBatch(
         monkeyocr=monkeyocr,
