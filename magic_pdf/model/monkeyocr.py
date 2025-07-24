@@ -14,7 +14,10 @@ from transformers import LayoutLMv3ForTokenClassification
 
 from magic_pdf.config.constants import *
 from magic_pdf.config.chat_content_type import LoraType
-from magic_pdf.utils.load_image import load_image, encode_image_base64
+from magic_pdf.utils.load_image import (
+    load_image,
+    # encode_image_base64,
+)
 from magic_pdf.model.sub_modules.layout.doclayout_yolo.DocLayoutYOLO import DocLayoutYOLOModel
 
 
@@ -75,18 +78,13 @@ class MonkeyOCR:
         layout_reader_config = self.layout_config.get("reader")
         self.layout_reader_name = layout_reader_config.get("name")
         if self.layout_reader_name == "layoutreader":
-            layoutreader_model_dir = os.path.join(models_dir, self.configs["weights"][self.layout_reader_name])
-            if os.path.exists(layoutreader_model_dir):
-                model = LayoutLMv3ForTokenClassification.from_pretrained(
-                    layoutreader_model_dir
-                )
-            else:
-                logger.warning(
-                    "local layoutreader model not exists, use online model from huggingface"
-                )
-                model = LayoutLMv3ForTokenClassification.from_pretrained(
-                    "hantian/layoutreader"
-                )
+            layoutreader_model_dir = os.path.join(
+                models_dir,
+                self.configs["weights"][self.layout_reader_name],
+            )
+            model = LayoutLMv3ForTokenClassification.from_pretrained(
+                layoutreader_model_dir
+            )
 
             if bf16_supported:
                 model.to(self.device).eval().bfloat16()
@@ -234,7 +232,7 @@ class MonkeyOCR:
 class MonkeyChatvLLMMultiModelAPI:
     def __init__(self, url: str, model_name: str, lora_config: dict, api_key: str = "EMPTY"):
         self.model_name = model_name
-        self.base_model = MonkeyChat_vLLM_API(
+        self.base_model = MonkeyChatvLLMAPI(
             url=url,
             model_name=model_name,
             api_key=api_key
@@ -243,7 +241,7 @@ class MonkeyChatvLLMMultiModelAPI:
         self.models = {}
         for lora_type, lora_name in lora_config.items():
             logger.info(f"Loading LoRA model: {lora_type} -> {lora_name}")
-            self.models[lora_type] = MonkeyChat_vLLM_API(
+            self.models[lora_type] = MonkeyChatvLLMAPI(
                 url=url,
                 model_name=lora_name,
                 api_key=api_key
@@ -296,7 +294,7 @@ class MonkeyChatvLLMMultiModelAPI:
         return [LoraType.BASE] + list(self.models.keys())
 
 
-class MonkeyChat_vLLM_API:
+class MonkeyChatvLLMAPI:
     def __init__(self, url: str, model_name: str, api_key: str = "EMPTY"):
         
         self.model_name = model_name

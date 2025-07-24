@@ -13,12 +13,10 @@ from fast_langdetect import detect_language
 
 
 def remove_invalid_surrogates(text):
-
     return ''.join(c for c in text if not (0xD800 <= ord(c) <= 0xDFFF))
 
 
 def detect_lang(text: str) -> str:
-
     if len(text) == 0:
         return ""
 

@@ -3,7 +3,7 @@ from loguru import logger
 
 from magic_pdf.data.dataset import Dataset
 from magic_pdf.libs.clean_memory import clean_memory
-from magic_pdf.operators.models_llm import LLMInferenceResult
+from magic_pdf.operators.models_llm import InferenceResult
 from magic_pdf.model.batch_analyze_llm import InferenceBatch
 from magic_pdf.model.monkeyocr import MonkeyOCR
 
@@ -13,7 +13,7 @@ def doc_analyze_llm(
     monkeyocr: MonkeyOCR,
     start_page_id=0,
     end_page_id=None,
-) -> LLMInferenceResult:
+) -> InferenceResult:
 
     end_page_id = end_page_id if end_page_id else len(dataset) - 1
 
@@ -68,7 +68,7 @@ def doc_analyze_llm(
         f"doc analyze time: {round(time.time() - doc_analyze_start, 2)},"
         f"speed: {doc_analyze_speed} pages/second"
     )
-    return LLMInferenceResult(
+    return InferenceResult(
         model_json,
         dataset,
     )

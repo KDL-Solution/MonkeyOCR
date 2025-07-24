@@ -1,4 +1,3 @@
-
 from magic_pdf.config.drop_tag import DropTag
 from magic_pdf.config.ocr_content_type import BlockType
 from magic_pdf.libs.boxbase import calculate_iou, get_minbox_if_overlap_by_ratio
@@ -33,12 +32,12 @@ def remove_overlaps_low_confidence_spans(spans):
     return spans, dropped_spans
 
 
-def check_chars_is_overlap_in_span(chars):
-    for i in range(len(chars)):
-        for j in range(i + 1, len(chars)):
-            if calculate_iou(chars[i]['bbox'], chars[j]['bbox']) > 0.35:
-                return True
-    return False
+# def check_chars_is_overlap_in_span(chars):
+#     for i in range(len(chars)):
+#         for j in range(i + 1, len(chars)):
+#             if calculate_iou(chars[i]['bbox'], chars[j]['bbox']) > 0.35:
+#                 return True
+#     return False
 
 
 def remove_overlaps_min_spans(spans):
@@ -60,12 +59,10 @@ def remove_overlaps_min_spans(spans):
         for span_need_remove in dropped_spans:
             spans.remove(span_need_remove)
             span_need_remove['tag'] = DropTag.SPAN_OVERLAP
-
     return spans, dropped_spans
 
 
 def get_qa_need_list_v2(blocks):
-
     images = []
     tables = []
     interline_equations = []

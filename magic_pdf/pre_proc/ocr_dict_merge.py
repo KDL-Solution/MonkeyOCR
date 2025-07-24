@@ -1,6 +1,8 @@
 from magic_pdf.config.ocr_content_type import BlockType, ContentType
-from magic_pdf.libs.boxbase import __is_overlaps_y_exceeds_threshold, calculate_overlap_area_in_bbox1_area_ratio
-
+from magic_pdf.libs.boxbase import (
+    __is_overlaps_y_exceeds_threshold,
+    calculate_overlap_area_in_bbox1_area_ratio,
+)
 
 
 def line_sort_spans_by_left_to_right(lines):
@@ -119,7 +121,6 @@ def fix_discarded_block(discarded_block_with_spans):
 
 
 def fix_text_block(block):
-
     for span in block['spans']:
         if span['type'] == ContentType.InterlineEquation:
             span['type'] = ContentType.InlineEquation

@@ -12,7 +12,78 @@ from magic_pdf.data.data_reader_writer import FileBasedDataWriter, FileBasedData
 from magic_pdf.data.dataset import PDFDataset, ImageDataset
 from magic_pdf.model.doc_analyze_by_custom_model_llm import doc_analyze_llm
 from magic_pdf.model.monkeyocr import MonkeyOCR
-from magic_pdf.operators.models_llm import LLMInferenceResult
+from magic_pdf.operators.models_llm import InferenceResult
+
+
+def parse_file(
+    input_file,
+    output_dir,
+    monkeyocr: MonkeyOCR,
+):
+    """
+    Parse file and save results
+    
+    Args:
+        input_file: Input PDF file path
+        output_dir: Output directory
+        monkeyocr: Pre-initialized model instance
+    """
+    print(f"Starting to parse file: {input_file}")
+    
+    # Check if input file exists
+    if not os.path.exists(input_file):
+        raise FileNotFoundError(f"Input file does not exist: {input_file}")
+    
+    # Get filename
+    name_without_suff = '.'.join(os.path.basename(input_file).split(".")[:-1])
+    
+    # Prepare output directory
+    local_image_dir = os.path.join(output_dir, name_without_suff, "images")
+    local_md_dir = os.path.join(output_dir, name_without_suff)
+    image_dir = os.path.basename(local_image_dir)
+    os.makedirs(local_image_dir, exist_ok=True)
+    os.makedirs(local_md_dir, exist_ok=True)
+    
+    print(f"Output dir: {local_md_dir}")
+    image_writer = FileBasedDataWriter(local_image_dir)
+    md_writer = FileBasedDataWriter(local_md_dir)
+    reader = FileBasedDataReader()
+    file_bytes = reader.read(input_file)
+
+    # Create dataset instance
+    file_extension = input_file.split(".")[-1].lower()
+    if file_extension == "pdf":
+        ds = PDFDataset(file_bytes)
+    else:
+        ds = ImageDataset(file_bytes)
+
+    # Start inference
+    print("Performing document parsing...")
+    start_time = time.time()
+
+    infer_result: InferenceResult = ds.apply(
+        doc_analyze_llm,
+        monkeyocr=monkeyocr,
+    )
+    # Pipeline processing
+    pipe_result = infer_result.pipe_ocr_mode(
+        image_writer=image_writer,
+        monkeyocr=monkeyocr,
+    )
+    
+    parsing_time = time.time() - start_time
+    print(f"Parsing time: {parsing_time:.2f}s")
+
+    infer_result.draw_model(os.path.join(local_md_dir, f"{name_without_suff}_model.pdf"))
+
+    pipe_result.draw_layout(os.path.join(local_md_dir, f"{name_without_suff}_layout.pdf"))
+    pipe_result.draw_span(os.path.join(local_md_dir, f"{name_without_suff}_spans.pdf"))
+    pipe_result.dump_markdown(md_writer, f"{name_without_suff}.md", image_dir)
+    pipe_result.dump_content_list(md_writer, f"{name_without_suff}_content_list.json", image_dir)
+    pipe_result.dump_middle_json(md_writer, f'{name_without_suff}_middle.json')
+
+    print("Results saved to ", local_md_dir)
+    return local_md_dir
 
 
 # def single_task_recognition(
@@ -109,82 +180,6 @@ from magic_pdf.operators.models_llm import LLMInferenceResult
         
 #     except Exception as e:
 #         raise RuntimeError(f"Single task recognition failed: {str(e)}")
-
-
-def parse_file(
-    input_file,
-    output_dir,
-    monkeyocr: MonkeyOCR,
-):
-    """
-    Parse file and save results
-    
-    Args:
-        input_file: Input PDF file path
-        output_dir: Output directory
-        monkeyocr: Pre-initialized model instance
-    """
-    print(f"Starting to parse file: {input_file}")
-    
-    # Check if input file exists
-    if not os.path.exists(input_file):
-        raise FileNotFoundError(f"Input file does not exist: {input_file}")
-    
-    # Get filename
-    name_without_suff = '.'.join(os.path.basename(input_file).split(".")[:-1])
-    
-    # Prepare output directory
-    local_image_dir = os.path.join(output_dir, name_without_suff, "images")
-    local_md_dir = os.path.join(output_dir, name_without_suff)
-    image_dir = os.path.basename(local_image_dir)
-    os.makedirs(local_image_dir, exist_ok=True)
-    os.makedirs(local_md_dir, exist_ok=True)
-    
-    print(f"Output dir: {local_md_dir}")
-    image_writer = FileBasedDataWriter(local_image_dir)
-    md_writer = FileBasedDataWriter(local_md_dir)
-    reader = FileBasedDataReader()
-    file_bytes = reader.read(input_file)
-
-    # Create dataset instance
-    file_extension = input_file.split(".")[-1].lower()
-    if file_extension == "pdf":
-        ds = PDFDataset(file_bytes)
-    else:
-        ds = ImageDataset(file_bytes)
-
-    # Start inference
-    print("Performing document parsing...")
-    start_time = time.time()
-    
-    infer_result: LLMInferenceResult = ds.apply(
-        doc_analyze_llm,
-        monkeyocr=monkeyocr,
-    )
-    # Pipeline processing
-    pipe_result = infer_result.pipe_ocr_mode(
-        image_writer=image_writer,
-        monkeyocr=monkeyocr,
-    )
-    
-    parsing_time = time.time() - start_time
-    print(f"Parsing time: {parsing_time:.2f}s")
-
-    infer_result.draw_model(os.path.join(local_md_dir, f"{name_without_suff}_model.pdf"))
-    
-    pipe_result.draw_layout(os.path.join(local_md_dir, f"{name_without_suff}_layout.pdf"))
-
-    pipe_result.draw_span(os.path.join(local_md_dir, f"{name_without_suff}_spans.pdf"))
-
-    
-    pipe_result.dump_md(md_writer, f"{name_without_suff}.md", image_dir)
-    
-    pipe_result.dump_content_list(md_writer, f"{name_without_suff}_content_list.json", image_dir)
-
-    pipe_result.dump_middle_json(md_writer, f'{name_without_suff}_middle.json')
-    
-    print("Results saved to ", local_md_dir)
-    return local_md_dir
 
 
 # def parse_folder(

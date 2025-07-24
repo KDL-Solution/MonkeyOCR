@@ -5,10 +5,10 @@ from magic_pdf.libs.boxbase import (
     calculate_vertical_projection_overlap_ratio,
     get_minbox_if_overlap_by_ratio
 )
-from magic_pdf.pre_proc.remove_bbox_overlap import remove_overlap_between_bbox_for_block
+# from magic_pdf.pre_proc.remove_bbox_overlap import remove_overlap_between_bbox_for_block
 
 
-def add_bboxes(blocks, block_type, bboxes):
+def _add_bboxes(blocks, block_type, bboxes):
     for block in blocks:
         x0, y0, x1, y1 = block['bbox']
         if block_type in [
@@ -57,63 +57,7 @@ def add_bboxes(blocks, block_type, bboxes):
             )
 
 
-def ocr_prepare_bboxes_for_layout_split_v2(
-    img_body_blocks,
-    img_caption_blocks,
-    img_footnote_blocks,
-    table_body_blocks,
-    table_caption_blocks,
-    table_footnote_blocks,
-    discarded_blocks,
-    text_blocks,
-    title_blocks,
-    interline_equation_blocks,
-    page_w,
-    page_h,
-):
-    all_bboxes = []
-
-    add_bboxes(img_body_blocks, BlockType.ImageBody, all_bboxes)
-    add_bboxes(img_caption_blocks, BlockType.ImageCaption, all_bboxes)
-    add_bboxes(img_footnote_blocks, BlockType.ImageFootnote, all_bboxes)
-    add_bboxes(table_body_blocks, BlockType.TableBody, all_bboxes)
-    add_bboxes(table_caption_blocks, BlockType.TableCaption, all_bboxes)
-    add_bboxes(table_footnote_blocks, BlockType.TableFootnote, all_bboxes)
-    add_bboxes(text_blocks, BlockType.Text, all_bboxes)
-    add_bboxes(title_blocks, BlockType.Title, all_bboxes)
-    add_bboxes(interline_equation_blocks, BlockType.InterlineEquation, all_bboxes)
-
-    all_bboxes = fix_text_overlap_title_blocks(all_bboxes)
-    all_bboxes = remove_need_drop_blocks(all_bboxes, discarded_blocks)
-
-
-    all_bboxes = fix_interline_equation_overlap_text_blocks_with_hi_iou(all_bboxes)
-
-
-    """discarded_blocks"""
-    all_discarded_blocks = []
-    add_bboxes(discarded_blocks, BlockType.Discarded, all_discarded_blocks)
-
-    footnote_blocks = []
-    for discarded in discarded_blocks:
-        x0, y0, x1, y1 = discarded['bbox']
-        if (x1 - x0) > (page_w / 3) and (y1 - y0) > 10 and y0 > (page_h / 2):
-            footnote_blocks.append([x0, y0, x1, y1])
-
-    need_remove_blocks = find_blocks_under_footnote(all_bboxes, footnote_blocks)
-    if len(need_remove_blocks) > 0:
-        for block in need_remove_blocks:
-            all_bboxes.remove(block)
-            all_discarded_blocks.append(block)
-
-    all_bboxes = remove_overlaps_min_blocks(all_bboxes)
-    all_discarded_blocks = remove_overlaps_min_blocks(all_discarded_blocks)
-    # all_bboxes, drop_reasons = remove_overlap_between_bbox_for_block(all_bboxes)
-    all_bboxes.sort(key=lambda x: x[0]+x[1])
-    return all_bboxes, all_discarded_blocks
-
-
-def find_blocks_under_footnote(all_bboxes, footnote_blocks):
+def _find_blocks_under_footnote(all_bboxes, footnote_blocks):
     need_remove_blocks = []
     for block in all_bboxes:
         block_x0, block_y0, block_x1, block_y1 = block[:4]
@@ -133,8 +77,7 @@ def find_blocks_under_footnote(all_bboxes, footnote_blocks):
     return need_remove_blocks
 
 
-def fix_interline_equation_overlap_text_blocks_with_hi_iou(all_bboxes):
-
+def _fix_interline_equation_overlap_text_blocks_with_hi_iou(all_bboxes):
     text_blocks = []
     for block in all_bboxes:
         if block[7] == BlockType.Text:
@@ -161,8 +104,7 @@ def fix_interline_equation_overlap_text_blocks_with_hi_iou(all_bboxes):
     return all_bboxes
 
 
-def fix_text_overlap_title_blocks(all_bboxes):
-
+def _fix_text_overlap_title_blocks(all_bboxes):
     text_blocks = []
     for block in all_bboxes:
         if block[7] == BlockType.Text:
@@ -185,11 +127,10 @@ def fix_text_overlap_title_blocks(all_bboxes):
     if len(need_remove) > 0:
         for block in need_remove:
             all_bboxes.remove(block)
-
     return all_bboxes
 
 
-def remove_need_drop_blocks(all_bboxes, discarded_blocks):
+def _remove_need_drop_blocks(all_bboxes, discarded_blocks):
     need_remove = []
     for block in all_bboxes:
         for discarded_block in discarded_blocks:
@@ -210,9 +151,7 @@ def remove_need_drop_blocks(all_bboxes, discarded_blocks):
     return all_bboxes
 
 
-def remove_overlaps_min_blocks(all_bboxes):
-
-
+def _remove_overlaps_min_blocks(all_bboxes):
     need_remove = []
     for block1 in all_bboxes:
         for block2 in all_bboxes:
@@ -244,5 +183,57 @@ def remove_overlaps_min_blocks(all_bboxes):
     if len(need_remove) > 0:
         for block in need_remove:
             all_bboxes.remove(block)
-
     return all_bboxes
+
+
+def prepare_bboxes_for_layout_split(
+    img_body_blocks,
+    img_caption_blocks,
+    img_footnote_blocks,
+    table_body_blocks,
+    table_caption_blocks,
+    table_footnote_blocks,
+    discarded_blocks,
+    text_blocks,
+    title_blocks,
+    interline_equation_blocks,
+    page_w,
+    page_h,
+):
+    all_bboxes = []
+
+    _add_bboxes(img_body_blocks, BlockType.ImageBody, all_bboxes)
+    _add_bboxes(img_caption_blocks, BlockType.ImageCaption, all_bboxes)
+    _add_bboxes(img_footnote_blocks, BlockType.ImageFootnote, all_bboxes)
+    _add_bboxes(table_body_blocks, BlockType.TableBody, all_bboxes)
+    _add_bboxes(table_caption_blocks, BlockType.TableCaption, all_bboxes)
+    _add_bboxes(table_footnote_blocks, BlockType.TableFootnote, all_bboxes)
+    _add_bboxes(text_blocks, BlockType.Text, all_bboxes)
+    _add_bboxes(title_blocks, BlockType.Title, all_bboxes)
+    _add_bboxes(interline_equation_blocks, BlockType.InterlineEquation, all_bboxes)
+
+    all_bboxes = _fix_text_overlap_title_blocks(all_bboxes)
+    all_bboxes = _remove_need_drop_blocks(all_bboxes, discarded_blocks)
+
+    all_bboxes = _fix_interline_equation_overlap_text_blocks_with_hi_iou(all_bboxes)
+
+    """discarded_blocks"""
+    all_discarded_blocks = []
+    _add_bboxes(discarded_blocks, BlockType.Discarded, all_discarded_blocks)
+
+    footnote_blocks = []
+    for discarded in discarded_blocks:
+        x0, y0, x1, y1 = discarded['bbox']
+        if (x1 - x0) > (page_w / 3) and (y1 - y0) > 10 and y0 > (page_h / 2):
+            footnote_blocks.append([x0, y0, x1, y1])
+
+    need_remove_blocks = _find_blocks_under_footnote(all_bboxes, footnote_blocks)
+    if len(need_remove_blocks) > 0:
+        for block in need_remove_blocks:
+            all_bboxes.remove(block)
+            all_discarded_blocks.append(block)
+
+    all_bboxes = _remove_overlaps_min_blocks(all_bboxes)
+    all_discarded_blocks = _remove_overlaps_min_blocks(all_discarded_blocks)
+    all_bboxes.sort(key=lambda x: x[0]+x[1])
+    return all_bboxes, all_discarded_blocks

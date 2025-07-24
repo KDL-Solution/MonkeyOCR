@@ -126,12 +126,10 @@ def __is_list_or_index_block(block):
                 if span_type == ContentType.Text:
                     line_text += span['content'].strip()
 
-
             lines_text_list.append(line_text)
             block_text = ''.join(lines_text_list)
             block_lang = detect_lang(block_text)
-            # logger.info(f"block_lang: {block_lang}")
-
+            logger.info(f"block_lang: {block_lang}")
 
             if abs(block['bbox_fs'][0] - line['bbox'][0]) < line_height / 2:
                 left_close_num += 1
@@ -146,8 +144,6 @@ def __is_list_or_index_block(block):
                 if block_lang in ['zh', 'ja', 'ko']:
                     closed_area = 0.26 * block_weight
                 else:
-
-
                     if block_weight_radio >= 0.5:
                         closed_area = 0.26 * block_weight
                     else:

@@ -1,66 +1,12 @@
+import torch
 from collections import defaultdict
 from typing import List, Dict
-
-import torch
 from transformers import LayoutLMv3ForTokenClassification
 
-MAX_LEN = 510
+# MAX_LEN = 510
 CLS_TOKEN_ID = 0
 UNK_TOKEN_ID = 3
 EOS_TOKEN_ID = 2
-
-
-class DataCollator:
-    def __call__(self, features: List[dict]) -> Dict[str, torch.Tensor]:
-        bbox = []
-        labels = []
-        input_ids = []
-        attention_mask = []
-
-        # clip bbox and labels to max length, build input_ids and attention_mask
-        for feature in features:
-            _bbox = feature["source_boxes"]
-            if len(_bbox) > MAX_LEN:
-                _bbox = _bbox[:MAX_LEN]
-            _labels = feature["target_index"]
-            if len(_labels) > MAX_LEN:
-                _labels = _labels[:MAX_LEN]
-            _input_ids = [UNK_TOKEN_ID] * len(_bbox)
-            _attention_mask = [1] * len(_bbox)
-            assert len(_bbox) == len(_labels) == len(_input_ids) == len(_attention_mask)
-            bbox.append(_bbox)
-            labels.append(_labels)
-            input_ids.append(_input_ids)
-            attention_mask.append(_attention_mask)
-
-        # add CLS and EOS tokens
-        for i in range(len(bbox)):
-            bbox[i] = [[0, 0, 0, 0]] + bbox[i] + [[0, 0, 0, 0]]
-            labels[i] = [-100] + labels[i] + [-100]
-            input_ids[i] = [CLS_TOKEN_ID] + input_ids[i] + [EOS_TOKEN_ID]
-            attention_mask[i] = [1] + attention_mask[i] + [1]
-
-        # padding to max length
-        max_len = max(len(x) for x in bbox)
-        for i in range(len(bbox)):
-            bbox[i] = bbox[i] + [[0, 0, 0, 0]] * (max_len - len(bbox[i]))
-            labels[i] = labels[i] + [-100] * (max_len - len(labels[i]))
-            input_ids[i] = input_ids[i] + [EOS_TOKEN_ID] * (max_len - len(input_ids[i]))
-            attention_mask[i] = attention_mask[i] + [0] * (
-                max_len - len(attention_mask[i])
-            )
-
-        ret = {
-            "bbox": torch.tensor(bbox),
-            "attention_mask": torch.tensor(attention_mask),
-            "labels": torch.tensor(labels),
-            "input_ids": torch.tensor(input_ids),
-        }
-        # set label > MAX_LEN to -100, because original labels may be > MAX_LEN
-        ret["labels"][ret["labels"] > MAX_LEN] = -100
-        # set label > 0 to label-1, because original labels are 1-indexed
-        ret["labels"][ret["labels"] > 0] -= 1
-        return ret
 
 
 def boxes2inputs(boxes: List[List[int]]) -> Dict[str, torch.Tensor]:
@@ -121,5 +67,60 @@ def parse_logits(logits: torch.Tensor, length: int) -> List[int]:
     return ret
 
 
-def check_duplicate(a: List[int]) -> bool:
-    return len(a) != len(set(a))
+### 미사용:
+# def check_duplicate(a: List[int]) -> bool:
+#     return len(a) != len(set(a))
+
+
+# class DataCollator:
+#     def __call__(self, features: List[dict]) -> Dict[str, torch.Tensor]:
+#         bbox = []
+#         labels = []
+#         input_ids = []
+#         attention_mask = []
+
+#         # clip bbox and labels to max length, build input_ids and attention_mask
+#         for feature in features:
+#             _bbox = feature["source_boxes"]
+#             if len(_bbox) > MAX_LEN:
+#                 _bbox = _bbox[:MAX_LEN]
+#             _labels = feature["target_index"]
+#             if len(_labels) > MAX_LEN:
+#                 _labels = _labels[:MAX_LEN]
+#             _input_ids = [UNK_TOKEN_ID] * len(_bbox)
+#             _attention_mask = [1] * len(_bbox)
+#             assert len(_bbox) == len(_labels) == len(_input_ids) == len(_attention_mask)
+#             bbox.append(_bbox)
+#             labels.append(_labels)
+#             input_ids.append(_input_ids)
+#             attention_mask.append(_attention_mask)
+
+#         # add CLS and EOS tokens
+#         for i in range(len(bbox)):
+#             bbox[i] = [[0, 0, 0, 0]] + bbox[i] + [[0, 0, 0, 0]]
+#             labels[i] = [-100] + labels[i] + [-100]
+#             input_ids[i] = [CLS_TOKEN_ID] + input_ids[i] + [EOS_TOKEN_ID]
+#             attention_mask[i] = [1] + attention_mask[i] + [1]
+
+#         # padding to max length
+#         max_len = max(len(x) for x in bbox)
+#         for i in range(len(bbox)):
+#             bbox[i] = bbox[i] + [[0, 0, 0, 0]] * (max_len - len(bbox[i]))
+#             labels[i] = labels[i] + [-100] * (max_len - len(labels[i]))
+#             input_ids[i] = input_ids[i] + [EOS_TOKEN_ID] * (max_len - len(input_ids[i]))
+#             attention_mask[i] = attention_mask[i] + [0] * (
+#                 max_len - len(attention_mask[i])
+#             )
+
+#         ret = {
+#             "bbox": torch.tensor(bbox),
+#             "attention_mask": torch.tensor(attention_mask),
+#             "labels": torch.tensor(labels),
+#             "input_ids": torch.tensor(input_ids),
+#         }
+#         # set label > MAX_LEN to -100, because original labels may be > MAX_LEN
+#         ret["labels"][ret["labels"] > MAX_LEN] = -100
+#         # set label > 0 to label-1, because original labels are 1-indexed
+#         ret["labels"][ret["labels"] > 0] -= 1
+#         return ret
+### : 미사용

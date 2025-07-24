@@ -3,8 +3,12 @@ import enum
 from magic_pdf.config.model_block_type import ModelBlockTypeEnum
 from magic_pdf.config.ocr_content_type import CategoryId, ContentType
 from magic_pdf.data.dataset import Dataset
-from magic_pdf.libs.boxbase import (_is_in, bbox_distance, bbox_relative_pos,
-                                    calculate_iou)
+from magic_pdf.libs.boxbase import (
+    _is_in,
+    bbox_distance,
+    bbox_relative_pos,
+    calculate_iou,
+)
 from magic_pdf.libs.coordinate_transform import get_scale_ratio
 from magic_pdf.pre_proc.remove_bbox_overlap import _remove_overlap_between_bbox
 
@@ -21,7 +25,6 @@ class PosRelationEnum(enum.Enum):
 
 
 class MagicModel:
-
     def __init__(self, model_list: list, docs: Dataset):
         self.__model_list = model_list
         self.__docs = docs

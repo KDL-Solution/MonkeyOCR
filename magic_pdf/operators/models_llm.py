@@ -9,13 +9,13 @@ from magic_pdf.data.data_reader_writer import DataWriter
 from magic_pdf.data.dataset import Dataset
 from magic_pdf.libs.draw_bbox import draw_model_bbox
 from magic_pdf.libs.version import __version__
-from magic_pdf.operators.pipes_llm import PipeResultLLM
-from magic_pdf.pdf_parse_union_core_v2_llm import pdf_parse_union
+from magic_pdf.operators.pipes_llm import PipeResult
+from MonkeyOCR.magic_pdf.pdf_parsing import pdf_parse_union
 from magic_pdf.operators import InferenceResultBase
 from magic_pdf.model.monkeyocr import MonkeyOCR
 
 
-class LLMInferenceResult(InferenceResultBase):
+class InferenceResult(InferenceResultBase):
     def __init__(self, inference_results: list, dataset: Dataset):
         """Initialized method.
 
@@ -78,8 +78,8 @@ class LLMInferenceResult(InferenceResultBase):
         start_page_id=0,
         end_page_id=None,
         debug_mode=False,
-        lang=None,
-    ) -> PipeResultLLM:
+        # lang=None,
+    ) -> PipeResult:
         """Post-proc the model inference result, Extract the text using `OCR`
         technical.
 
@@ -97,7 +97,7 @@ class LLMInferenceResult(InferenceResultBase):
         def proc(
             *args,
             **kwargs,
-        ) -> PipeResultLLM:
+        ) -> PipeResult:
             res = pdf_parse_union(*args, **kwargs)
             res['_parse_type'] = PARSE_TYPE_OCR
             res['_version_name'] = __version__
@@ -105,7 +105,7 @@ class LLMInferenceResult(InferenceResultBase):
             # if 'lang' in kwargs and kwargs['lang'] is not None:
             #     res['lang'] = kwargs['lang']
             ### : 미사용
-            return PipeResultLLM(res, self._dataset)
+            return PipeResult(res, self._dataset)
 
         res = self.apply(
             proc,

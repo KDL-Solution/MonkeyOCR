@@ -3,7 +3,7 @@ from typing import Callable
 
 from magic_pdf.data.data_reader_writer import DataWriter
 from magic_pdf.data.dataset import Dataset
-from magic_pdf.operators.pipes_llm import PipeResultLLM
+from magic_pdf.operators.pipes_llm import PipeResult
 
 
 class InferenceResultBase(ABC):
@@ -66,7 +66,7 @@ class InferenceResultBase(ABC):
         end_page_id=None,
         debug_mode=False,
         lang=None,
-    ) -> PipeResultLLM:
+    ) -> PipeResult:
         """Post-proc the model inference result, Extract the text using the
         third library, such as `pymupdf`
 
@@ -90,5 +90,5 @@ class InferenceResultBase(ABC):
         end_page_id=None,
         debug_mode=False,
         lang=None,
-    ) -> PipeResultLLM:
+    ) -> PipeResult:
         pass

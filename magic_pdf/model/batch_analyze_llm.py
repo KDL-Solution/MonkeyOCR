@@ -1,37 +1,50 @@
-import base64
 import copy
 import time
 import re
-import cv2
-import numpy as np
-import torch
 from loguru import logger
 from PIL import Image
 from typing import List
+# import base64
+# import cv2
+# import numpy as np
+# import torch
 
 from magic_pdf.config.constants import MODEL_NAME
 from magic_pdf.config.ocr_content_type import CategoryId
-from magic_pdf.config.chat_content_type import TaskInstructions, LoraType, LoraInstructions
-from io import BytesIO, StringIO
+from magic_pdf.config.chat_content_type import (
+    TaskInstructions,
+    LoraType,
+    LoraInstructions,
+)
+from io import (
+    StringIO,
+    # BytesIO,
+)
 from PIL import Image
 from magic_pdf.model.sub_modules.model_utils import (
-    clean_vram, crop_img)
+    clean_vram,
+    crop_img,
+)
 from docling_core.types.doc.document import DocTagsDocument, DoclingDocument
 from magic_pdf.model.monkeyocr import MonkeyOCR
 
 YOLO_LAYOUT_BASE_BATCH_SIZE = 1
 
-    
+
 def sanitize_md(output):
-        cleaned = re.match(r"<md>.*</md>", output, flags=re.DOTALL)
-        if cleaned is None:
-            return output.replace("<md>", "").replace("</md>", "").replace("md\n","").strip()
-        return f"""{cleaned[0].replace("<md>", "").replace("</md>", "").strip()}"""
-def sanitize_mf(output):
+    cleaned = re.match(r"<md>.*</md>", output, flags=re.DOTALL)
+    if cleaned is None:
+        return output.replace("<md>", "").replace("</md>", "").replace("md\n","").strip()
+    return f"""{cleaned[0].replace("<md>", "").replace("</md>", "").strip()}"""
+
+
+def sanitize_math_formula(output):
     cleaned = re.match(r"\$\$.*\$\$", output, flags=re.DOTALL)
     if cleaned is None:
         return output.replace("$$", "").strip()
     return f"""{cleaned[0].replace("$$", "").strip()}"""
+
+
 def sanitize_html(output):
     otsl_match = re.search(r"<otsl>.*?</otsl>", output, flags=re.DOTALL)
     if otsl_match:
@@ -55,6 +68,7 @@ def sanitize_html(output):
     if cleaned is None:
         return "<html>\n"+output.replace("```html","<html>").replace("```","</html>").strip()+"\n</html>"
     return f"""{cleaned[0].replace("```html","<html>").replace("```","</html>").strip()}"""
+
 
 class LLMConfig:
     CATEGORY_MAPPING = {
@@ -108,15 +122,11 @@ class LLMConfig:
         },
         CategoryId.InterlineEquation_Layout: {
             "task_instruction": TaskInstructions.FORMULA,
-            "sanitizer": sanitize_mf
+            "sanitizer": sanitize_math_formula
         },
-        # 9 : {
-        #     "task_instruction": TaskInstructions.TEXT,
-        #     "sanitizer": sanitize_md
-        # },
         CategoryId.InterlineEquation_YOLO: {
             "task_instruction": TaskInstructions.FORMULA,
-            "sanitizer": sanitize_mf
+            "sanitizer": sanitize_math_formula
         },
         CategoryId.ImageFootnote: {
             "task_instruction": TaskInstructions.TEXT,
@@ -161,7 +171,7 @@ class InferenceBatch:
     def __init__(
         self,
         monkeyocr: MonkeyOCR,
-        backend="lmdeploy",
+        backend="vllm_api",
     ):
         self.monkeyocr = monkeyocr
         self.backend = backend
@@ -186,15 +196,15 @@ class InferenceBatch:
             )
 
             for image_index, useful_list in modified_images:
-                for res in images_layout_res[image_index]:
-                    for i in range(len(res["poly"])):
+                for layout_out in images_layout_res[image_index]:
+                    for i in range(len(layout_out["poly"])):
                         if i % 2 == 0:
-                            res["poly"][i] = (
-                                res["poly"][i] - useful_list[0] + useful_list[2]
+                            layout_out["poly"][i] = (
+                                layout_out["poly"][i] - useful_list[0] + useful_list[2]
                             )
                         else:
-                            res["poly"][i] = (
-                                res["poly"][i] - useful_list[1] + useful_list[3]
+                            layout_out["poly"][i] = (
+                                layout_out["poly"][i] - useful_list[1] + useful_list[3]
                             )
         logger.info(
             f"layout time: {round(time.time() - layout_start_time, 2)}, image num: {len(images)}"
@@ -210,40 +220,42 @@ class InferenceBatch:
         cids_all = []
         page_idxs = []
         for index in range(len(images)):
-            layout_res = images_layout_res[index]
+            layout_outs = images_layout_res[index]
             pil_img = Image.fromarray(images[index])
             new_images = []
             cids = []
-            for res in layout_res:
+            for layout_out in layout_outs:
                 new_image, useful_list = crop_img(
-                    res, pil_img, crop_paste_x=50, crop_paste_y=50
+                    layout_out,
+                    pil_img,
+                    crop_paste_x=50,
+                    crop_paste_y=50,
                 )
                 new_images.append(new_image)
-                cids.append(res["category_id"])
+                cids.append(layout_out["category_id"])
             
             new_images_all.extend(new_images)
             cids_all.extend(cids)
             page_idxs.append(len(new_images_all) - len(new_images))
 
         logger.info("VLM OCR start...")
-        ocr_result = self.llm_infer_batch(new_images_all, cids_all)
+        llm_outs = self.llm_infer_batch(new_images_all, cids_all)
         for index in range(len(images)):
             ocr_results = []
-            layout_res = images_layout_res[index]
-            for i in range(len(layout_res)):
-                res = layout_res[i]
-                ocr = ocr_result[page_idxs[index]+i]
-                # ocr = self.llm_ocr(new_image, res["category_id"])
-                if res["category_id"] in [
+            layout_outs = images_layout_res[index]
+            for i in range(len(layout_outs)):
+                layout_out = layout_outs[i]
+                llm_out = llm_outs[page_idxs[index]+i]
+                if layout_out["category_id"] in [
                     CategoryId.InterlineEquation_Layout, 
                     CategoryId.InterlineEquation_YOLO
                 ]:
-                    temp_res = copy.deepcopy(res)
+                    temp_res = copy.deepcopy(layout_out)
                     temp_res["category_id"] = CategoryId.InterlineEquation_YOLO
-                    temp_res["score"] = 1.0
-                    temp_res["latex"] = ocr
+                    temp_res["score"] = 1.
+                    temp_res["latex"] = llm_out
                     ocr_results.append(temp_res)
-                elif res["category_id"] in [
+                elif layout_out["category_id"] in [
                     CategoryId.Title, 
                     CategoryId.Text, 
                     CategoryId.Abandon, 
@@ -252,15 +264,15 @@ class InferenceBatch:
                     CategoryId.TableFootnote, 
                     CategoryId.ImageFootnote
                 ]:
-                    temp_res = copy.deepcopy(res)
+                    temp_res = copy.deepcopy(layout_out)
                     temp_res["category_id"] = CategoryId.OcrText
-                    temp_res["score"] = 1.0
-                    temp_res["text"] = ocr
+                    temp_res["score"] = 1.
+                    temp_res["text"] = llm_out
                     ocr_results.append(temp_res)
-                elif res["category_id"] == CategoryId.TableBody:
-                    res["score"] = 1.0
-                    res["html"] = ocr
-            layout_res.extend(ocr_results)
+                elif layout_out["category_id"] == CategoryId.TableBody:
+                    layout_out["score"] = 1.
+                    layout_out["html"] = llm_out
+            layout_outs.extend(ocr_results)
             logger.info(f"OCR processed images / total images: {index+1} / {len(images)}")
         logger.info(
             f"llm ocr time: {round(time.time() - llm_ocr_start, 2)}, image num: {len(images)}"

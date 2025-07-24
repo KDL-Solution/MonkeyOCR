@@ -3,6 +3,7 @@ weights:
   doclayout_yolo: Structure/doclayout_yolo_docstructbench_imgsz1280_2501.pt
   # doclayout_yolo: layout_zh.pt
   layoutreader: Relation
+  # layoutreader: hantian/layoutreader  # https://huggingface.co/hantian/layoutreader
 models_dir: model_weight
 layout_config: 
   model: doclayout_yolo

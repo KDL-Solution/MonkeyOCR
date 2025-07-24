@@ -7,7 +7,7 @@ from loguru import logger
 # from magic_pdf.config.enums import SupportedPdfParseMethod
 from magic_pdf.data.schemas import PageInfo
 from magic_pdf.data.utils import fitz_page_to_image
-from magic_pdf.filter import classify
+# from magic_pdf.filter import classify
 
 
 class PageableData(ABC):

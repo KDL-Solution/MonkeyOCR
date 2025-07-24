@@ -14,31 +14,6 @@ def _is_in_or_part_overlap(box1, box2) -> bool:
                 y0_1 > y1_2)
 
 
-def _is_in_or_part_overlap_with_area_ratio(box1,
-                                           box2,
-                                           area_ratio_threshold=0.6):
-    if box1 is None or box2 is None:
-        return False
-
-    x0_1, y0_1, x1_1, y1_1 = box1
-    x0_2, y0_2, x1_2, y1_2 = box2
-
-    if not _is_in_or_part_overlap(box1, box2):
-        return False
-
-
-    x_left = max(x0_1, x0_2)
-    y_top = max(y0_1, y0_2)
-    x_right = min(x1_1, x1_2)
-    y_bottom = min(y1_1, y1_2)
-    overlap_area = (x_right - x_left) * (y_bottom - y_top)
-
-
-    box1_area = (x1_1 - x0_1) * (y1_1 - y0_1)
-
-    return overlap_area / box1_area > area_ratio_threshold
-
-
 def _is_in(box1, box2) -> bool:
     x0_1, y0_1, x1_1, y1_1 = box1
     x0_2, y0_2, x1_2, y1_2 = box2
@@ -56,86 +31,11 @@ def _is_part_overlap(box1, box2) -> bool:
     return _is_in_or_part_overlap(box1, box2) and not _is_in(box1, box2)
 
 
-def _left_intersect(left_box, right_box):
-    if left_box is None or right_box is None:
-        return False
-
-    x0_1, y0_1, x1_1, y1_1 = left_box
-    x0_2, y0_2, x1_2, y1_2 = right_box
-
-    return x1_1 > x0_2 and x0_1 < x0_2 and (y0_1 <= y0_2 <= y1_1
-                                            or y0_1 <= y1_2 <= y1_1)
-
-
-def _right_intersect(left_box, right_box):
-    if left_box is None or right_box is None:
-        return False
-
-    x0_1, y0_1, x1_1, y1_1 = left_box
-    x0_2, y0_2, x1_2, y1_2 = right_box
-
-    return x0_1 < x1_2 and x1_1 > x1_2 and (y0_1 <= y0_2 <= y1_1
-                                            or y0_1 <= y1_2 <= y1_1)
-
-
-def _is_vertical_full_overlap(box1, box2, x_torlence=2):
-
-    x11, y11, x12, y12 = box1
-    x21, y21, x22, y22 = box2
-
-
-    contains_in_x = (x11 - x_torlence <= x21 and x12 + x_torlence >= x22) or (
-        x21 - x_torlence <= x11 and x22 + x_torlence >= x12)
-
-
-    overlap_in_y = not (y12 < y21 or y11 > y22)
-
-    return contains_in_x and overlap_in_y
-
-
-def _is_bottom_full_overlap(box1, box2, y_tolerance=2):
-    if box1 is None or box2 is None:
-        return False
-
-    x0_1, y0_1, x1_1, y1_1 = box1
-    x0_2, y0_2, x1_2, y1_2 = box2
-    tolerance_margin = 2
-    is_xdir_full_overlap = (
-        (x0_1 - tolerance_margin <= x0_2 <= x1_1 + tolerance_margin
-         and x0_1 - tolerance_margin <= x1_2 <= x1_1 + tolerance_margin)
-        or (x0_2 - tolerance_margin <= x0_1 <= x1_2 + tolerance_margin
-            and x0_2 - tolerance_margin <= x1_1 <= x1_2 + tolerance_margin))
-
-    return y0_2 < y1_1 and 0 < (y1_1 -
-                                y0_2) < y_tolerance and is_xdir_full_overlap
-
-
-def _is_left_overlap(
-    box1,
-    box2,
+def __is_overlaps_y_exceeds_threshold(
+    bbox1,
+    bbox2,
+    overlap_ratio_threshold=0.8,
 ):
-
-    def __overlap_y(Ay1, Ay2, By1, By2):
-        return max(0, min(Ay2, By2) - max(Ay1, By1))
-
-    if box1 is None or box2 is None:
-        return False
-
-    x0_1, y0_1, x1_1, y1_1 = box1
-    x0_2, y0_2, x1_2, y1_2 = box2
-
-    y_overlap_len = __overlap_y(y0_1, y1_1, y0_2, y1_2)
-    ratio_1 = 1.0 * y_overlap_len / (y1_1 - y0_1) if y1_1 - y0_1 != 0 else 0
-    ratio_2 = 1.0 * y_overlap_len / (y1_2 - y0_2) if y1_2 - y0_2 != 0 else 0
-    vertical_overlap_cond = ratio_1 >= 0.5 or ratio_2 >= 0.5
-
-    # vertical_overlap_cond = y0_1<=y0_2<=y1_1 or y0_1<=y1_2<=y1_1 or y0_2<=y0_1<=y1_2 or y0_2<=y1_1<=y1_2
-    return x0_1 <= x0_2 <= x1_1 and vertical_overlap_cond
-
-
-def __is_overlaps_y_exceeds_threshold(bbox1,
-                                      bbox2,
-                                      overlap_ratio_threshold=0.8):
     _, y0_1, _, y1_1 = bbox1
     _, y0_2, _, y1_2 = bbox2
 
@@ -228,120 +128,6 @@ def get_minbox_if_overlap_by_ratio(bbox1, bbox2, ratio):
         return None
 
 
-def get_bbox_in_boundary(bboxes: list, boundary: tuple) -> list:
-    x0, y0, x1, y1 = boundary
-    new_boxes = [
-        box for box in bboxes
-        if box[0] >= x0 and box[1] >= y0 and box[2] <= x1 and box[3] <= y1
-    ]
-    return new_boxes
-
-
-def is_vbox_on_side(bbox, width, height, side_threshold=0.2):
-    x0, x1 = bbox[0], bbox[2]
-    if x1 <= width * side_threshold or x0 >= width * (1 - side_threshold):
-        return True
-    return False
-
-
-def find_top_nearest_text_bbox(pymu_blocks, obj_bbox):
-    tolerance_margin = 4
-    top_boxes = [
-        box for box in pymu_blocks
-        if obj_bbox[1] - box['bbox'][3] >= -tolerance_margin
-        and not _is_in(box['bbox'], obj_bbox)
-    ]
-
-    top_boxes = [
-        box for box in top_boxes if any([
-            obj_bbox[0] - tolerance_margin <= box['bbox'][0] <= obj_bbox[2] +
-            tolerance_margin, obj_bbox[0] -
-            tolerance_margin <= box['bbox'][2] <= obj_bbox[2] +
-            tolerance_margin, box['bbox'][0] -
-            tolerance_margin <= obj_bbox[0] <= box['bbox'][2] +
-            tolerance_margin, box['bbox'][0] -
-            tolerance_margin <= obj_bbox[2] <= box['bbox'][2] +
-            tolerance_margin
-        ])
-    ]
-
-
-    if len(top_boxes) > 0:
-        top_boxes.sort(key=lambda x: x['bbox'][3], reverse=True)
-        return top_boxes[0]
-    else:
-        return None
-
-
-def find_bottom_nearest_text_bbox(pymu_blocks, obj_bbox):
-    bottom_boxes = [
-        box for box in pymu_blocks if box['bbox'][1] -
-        obj_bbox[3] >= -2 and not _is_in(box['bbox'], obj_bbox)
-    ]
-
-    bottom_boxes = [
-        box for box in bottom_boxes if any([
-            obj_bbox[0] - 2 <= box['bbox'][0] <= obj_bbox[2] + 2, obj_bbox[0] -
-            2 <= box['bbox'][2] <= obj_bbox[2] + 2, box['bbox'][0] -
-            2 <= obj_bbox[0] <= box['bbox'][2] + 2, box['bbox'][0] -
-            2 <= obj_bbox[2] <= box['bbox'][2] + 2
-        ])
-    ]
-
-
-    if len(bottom_boxes) > 0:
-        bottom_boxes.sort(key=lambda x: x['bbox'][1], reverse=False)
-        return bottom_boxes[0]
-    else:
-        return None
-
-
-def find_left_nearest_text_bbox(pymu_blocks, obj_bbox):
-    left_boxes = [
-        box for box in pymu_blocks if obj_bbox[0] -
-        box['bbox'][2] >= -2 and not _is_in(box['bbox'], obj_bbox)
-    ]
-
-    left_boxes = [
-        box for box in left_boxes if any([
-            obj_bbox[1] - 2 <= box['bbox'][1] <= obj_bbox[3] + 2, obj_bbox[1] -
-            2 <= box['bbox'][3] <= obj_bbox[3] + 2, box['bbox'][1] -
-            2 <= obj_bbox[1] <= box['bbox'][3] + 2, box['bbox'][1] -
-            2 <= obj_bbox[3] <= box['bbox'][3] + 2
-        ])
-    ]
-
-
-    if len(left_boxes) > 0:
-        left_boxes.sort(key=lambda x: x['bbox'][2], reverse=True)
-        return left_boxes[0]
-    else:
-        return None
-
-
-def find_right_nearest_text_bbox(pymu_blocks, obj_bbox):
-    right_boxes = [
-        box for box in pymu_blocks if box['bbox'][0] -
-        obj_bbox[2] >= -2 and not _is_in(box['bbox'], obj_bbox)
-    ]
-
-    right_boxes = [
-        box for box in right_boxes if any([
-            obj_bbox[1] - 2 <= box['bbox'][1] <= obj_bbox[3] + 2, obj_bbox[1] -
-            2 <= box['bbox'][3] <= obj_bbox[3] + 2, box['bbox'][1] -
-            2 <= obj_bbox[1] <= box['bbox'][3] + 2, box['bbox'][1] -
-            2 <= obj_bbox[3] <= box['bbox'][3] + 2
-        ])
-    ]
-
-
-    if len(right_boxes) > 0:
-        right_boxes.sort(key=lambda x: x['bbox'][0], reverse=False)
-        return right_boxes[0]
-    else:
-        return None
-
-
 def bbox_relative_pos(bbox1, bbox2):
     x1, y1, x1b, y1b = bbox1
     x2, y2, x2b, y2b = bbox2
@@ -354,7 +140,6 @@ def bbox_relative_pos(bbox1, bbox2):
 
 
 def bbox_distance(bbox1, bbox2):
-
     def dist(point1, point2):
         return math.sqrt((point1[0] - point2[0])**2 +
                          (point1[1] - point2[1])**2)
@@ -381,24 +166,6 @@ def bbox_distance(bbox1, bbox2):
     elif top:
         return y2 - y1b
     return 0.0
-
-
-def box_area(bbox):
-    return (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
-
-
-def get_overlap_area(bbox1, bbox2):
-    # Determine the coordinates of the intersection rectangle
-    x_left = max(bbox1[0], bbox2[0])
-    y_top = max(bbox1[1], bbox2[1])
-    x_right = min(bbox1[2], bbox2[2])
-    y_bottom = min(bbox1[3], bbox2[3])
-
-    if x_right < x_left or y_bottom < y_top:
-        return 0.0
-
-    # The area of overlap area
-    return (x_right - x_left) * (y_bottom - y_top)
 
 
 def calculate_vertical_projection_overlap_ratio(block1, block2):
@@ -434,3 +201,233 @@ def calculate_vertical_projection_overlap_ratio(block1, block2):
     # Proportion of the x-axis covered by the intersection
     # logger.info(f"intersection_length: {intersection_length}, block1_length: {block1_length}")
     return intersection_length / block1_length
+
+
+### 미사용:
+# def _is_in_or_part_overlap_with_area_ratio(box1,
+#                                            box2,
+#                                            area_ratio_threshold=0.6):
+#     if box1 is None or box2 is None:
+#         return False
+
+#     x0_1, y0_1, x1_1, y1_1 = box1
+#     x0_2, y0_2, x1_2, y1_2 = box2
+
+#     if not _is_in_or_part_overlap(box1, box2):
+#         return False
+
+#     x_left = max(x0_1, x0_2)
+#     y_top = max(y0_1, y0_2)
+#     x_right = min(x1_1, x1_2)
+#     y_bottom = min(y1_1, y1_2)
+#     overlap_area = (x_right - x_left) * (y_bottom - y_top)
+
+#     box1_area = (x1_1 - x0_1) * (y1_1 - y0_1)
+
+#     return overlap_area / box1_area > area_ratio_threshold
+
+
+# def _left_intersect(left_box, right_box):
+#     if left_box is None or right_box is None:
+#         return False
+
+#     x0_1, y0_1, x1_1, y1_1 = left_box
+#     x0_2, y0_2, x1_2, y1_2 = right_box
+
+#     return x1_1 > x0_2 and x0_1 < x0_2 and (y0_1 <= y0_2 <= y1_1
+#                                             or y0_1 <= y1_2 <= y1_1)
+
+
+# def _right_intersect(left_box, right_box):
+#     if left_box is None or right_box is None:
+#         return False
+
+#     x0_1, y0_1, x1_1, y1_1 = left_box
+#     x0_2, y0_2, x1_2, y1_2 = right_box
+
+#     return x0_1 < x1_2 and x1_1 > x1_2 and (y0_1 <= y0_2 <= y1_1
+#                                             or y0_1 <= y1_2 <= y1_1)
+
+
+# def _is_vertical_full_overlap(box1, box2, x_torlence=2):
+#     x11, y11, x12, y12 = box1
+#     x21, y21, x22, y22 = box2
+
+
+#     contains_in_x = (x11 - x_torlence <= x21 and x12 + x_torlence >= x22) or (
+#         x21 - x_torlence <= x11 and x22 + x_torlence >= x12)
+
+
+#     overlap_in_y = not (y12 < y21 or y11 > y22)
+
+#     return contains_in_x and overlap_in_y
+
+
+# def _is_bottom_full_overlap(box1, box2, y_tolerance=2):
+#     if box1 is None or box2 is None:
+#         return False
+
+#     x0_1, y0_1, x1_1, y1_1 = box1
+#     x0_2, y0_2, x1_2, y1_2 = box2
+#     tolerance_margin = 2
+#     is_xdir_full_overlap = (
+#         (x0_1 - tolerance_margin <= x0_2 <= x1_1 + tolerance_margin
+#          and x0_1 - tolerance_margin <= x1_2 <= x1_1 + tolerance_margin)
+#         or (x0_2 - tolerance_margin <= x0_1 <= x1_2 + tolerance_margin
+#             and x0_2 - tolerance_margin <= x1_1 <= x1_2 + tolerance_margin))
+
+#     return y0_2 < y1_1 and 0 < (y1_1 -
+#                                 y0_2) < y_tolerance and is_xdir_full_overlap
+
+
+# def _is_left_overlap(
+#     box1,
+#     box2,
+# ):
+
+#     def __overlap_y(Ay1, Ay2, By1, By2):
+#         return max(0, min(Ay2, By2) - max(Ay1, By1))
+
+#     if box1 is None or box2 is None:
+#         return False
+
+#     x0_1, y0_1, x1_1, y1_1 = box1
+#     x0_2, y0_2, x1_2, y1_2 = box2
+
+#     y_overlap_len = __overlap_y(y0_1, y1_1, y0_2, y1_2)
+#     ratio_1 = 1.0 * y_overlap_len / (y1_1 - y0_1) if y1_1 - y0_1 != 0 else 0
+#     ratio_2 = 1.0 * y_overlap_len / (y1_2 - y0_2) if y1_2 - y0_2 != 0 else 0
+#     vertical_overlap_cond = ratio_1 >= 0.5 or ratio_2 >= 0.5
+
+#     # vertical_overlap_cond = y0_1<=y0_2<=y1_1 or y0_1<=y1_2<=y1_1 or y0_2<=y0_1<=y1_2 or y0_2<=y1_1<=y1_2
+#     return x0_1 <= x0_2 <= x1_1 and vertical_overlap_cond
+
+
+# def get_bbox_in_boundary(bboxes: list, boundary: tuple) -> list:
+#     x0, y0, x1, y1 = boundary
+#     new_boxes = [
+#         box for box in bboxes
+#         if box[0] >= x0 and box[1] >= y0 and box[2] <= x1 and box[3] <= y1
+#     ]
+#     return new_boxes
+
+
+# def is_vbox_on_side(bbox, width, height, side_threshold=0.2):
+#     x0, x1 = bbox[0], bbox[2]
+#     if x1 <= width * side_threshold or x0 >= width * (1 - side_threshold):
+#         return True
+#     return False
+
+
+# def find_top_nearest_text_bbox(pymu_blocks, obj_bbox):
+#     tolerance_margin = 4
+#     top_boxes = [
+#         box for box in pymu_blocks
+#         if obj_bbox[1] - box['bbox'][3] >= -tolerance_margin
+#         and not _is_in(box['bbox'], obj_bbox)
+#     ]
+
+#     top_boxes = [
+#         box for box in top_boxes if any([
+#             obj_bbox[0] - tolerance_margin <= box['bbox'][0] <= obj_bbox[2] +
+#             tolerance_margin, obj_bbox[0] -
+#             tolerance_margin <= box['bbox'][2] <= obj_bbox[2] +
+#             tolerance_margin, box['bbox'][0] -
+#             tolerance_margin <= obj_bbox[0] <= box['bbox'][2] +
+#             tolerance_margin, box['bbox'][0] -
+#             tolerance_margin <= obj_bbox[2] <= box['bbox'][2] +
+#             tolerance_margin
+#         ])
+#     ]
+
+#     if len(top_boxes) > 0:
+#         top_boxes.sort(key=lambda x: x['bbox'][3], reverse=True)
+#         return top_boxes[0]
+#     else:
+#         return None
+
+
+# def find_bottom_nearest_text_bbox(pymu_blocks, obj_bbox):
+#     bottom_boxes = [
+#         box for box in pymu_blocks if box['bbox'][1] -
+#         obj_bbox[3] >= -2 and not _is_in(box['bbox'], obj_bbox)
+#     ]
+
+#     bottom_boxes = [
+#         box for box in bottom_boxes if any([
+#             obj_bbox[0] - 2 <= box['bbox'][0] <= obj_bbox[2] + 2, obj_bbox[0] -
+#             2 <= box['bbox'][2] <= obj_bbox[2] + 2, box['bbox'][0] -
+#             2 <= obj_bbox[0] <= box['bbox'][2] + 2, box['bbox'][0] -
+#             2 <= obj_bbox[2] <= box['bbox'][2] + 2
+#         ])
+#     ]
+
+#     if len(bottom_boxes) > 0:
+#         bottom_boxes.sort(key=lambda x: x['bbox'][1], reverse=False)
+#         return bottom_boxes[0]
+#     else:
+#         return None
+
+
+# def find_left_nearest_text_bbox(pymu_blocks, obj_bbox):
+#     left_boxes = [
+#         box for box in pymu_blocks if obj_bbox[0] -
+#         box['bbox'][2] >= -2 and not _is_in(box['bbox'], obj_bbox)
+#     ]
+
+#     left_boxes = [
+#         box for box in left_boxes if any([
+#             obj_bbox[1] - 2 <= box['bbox'][1] <= obj_bbox[3] + 2, obj_bbox[1] -
+#             2 <= box['bbox'][3] <= obj_bbox[3] + 2, box['bbox'][1] -
+#             2 <= obj_bbox[1] <= box['bbox'][3] + 2, box['bbox'][1] -
+#             2 <= obj_bbox[3] <= box['bbox'][3] + 2
+#         ])
+#     ]
+
+
+#     if len(left_boxes) > 0:
+#         left_boxes.sort(key=lambda x: x['bbox'][2], reverse=True)
+#         return left_boxes[0]
+#     else:
+#         return None
+
+
+# def find_right_nearest_text_bbox(pymu_blocks, obj_bbox):
+#     right_boxes = [
+#         box for box in pymu_blocks if box['bbox'][0] -
+#         obj_bbox[2] >= -2 and not _is_in(box['bbox'], obj_bbox)
+#     ]
+
+#     right_boxes = [
+#         box for box in right_boxes if any([
+#             obj_bbox[1] - 2 <= box['bbox'][1] <= obj_bbox[3] + 2, obj_bbox[1] -
+#             2 <= box['bbox'][3] <= obj_bbox[3] + 2, box['bbox'][1] -
+#             2 <= obj_bbox[1] <= box['bbox'][3] + 2, box['bbox'][1] -
+#             2 <= obj_bbox[3] <= box['bbox'][3] + 2
+#         ])
+#     ]
+
+#     if len(right_boxes) > 0:
+#         right_boxes.sort(key=lambda x: x['bbox'][0], reverse=False)
+#         return right_boxes[0]
+#     else:
+#         return None
+
+
+# def box_area(bbox):
+#     return (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
+
+
+# def get_overlap_area(bbox1, bbox2):
+#     # Determine the coordinates of the intersection rectangle
+#     x_left = max(bbox1[0], bbox2[0])
+#     y_top = max(bbox1[1], bbox2[1])
+#     x_right = min(bbox1[2], bbox2[2])
+#     y_bottom = min(bbox1[3], bbox2[3])
+
+#     if x_right < x_left or y_bottom < y_top:
+#         return 0.0
+
+#     # The area of overlap area
+#     return (x_right - x_left) * (y_bottom - y_top)
+### : 미사용

@@ -356,54 +356,56 @@ def draw_model_bbox(model_list, dataset: Dataset, out_path, filename):
     dataset.dump_to_file(f'{out_path}/{filename}')
 
 
-def draw_line_sort_bbox(pdf_info, pdf_bytes, out_path, filename):
-    layout_bbox_list = []
+### 미사용:
+# def draw_line_sort_bbox(pdf_info, pdf_bytes, out_path, filename):
+#     layout_bbox_list = []
 
-    for page in pdf_info:
-        page_line_list = []
-        for block in page['preproc_blocks']:
-            if block['type'] in [BlockType.Text]:
-                for line in block['lines']:
-                    bbox = line['bbox']
-                    index = line['index']
-                    page_line_list.append({'index': index, 'bbox': bbox})
-            elif block['type'] in [BlockType.Title, BlockType.InterlineEquation]:
-                if 'virtual_lines' in block:
-                    if len(block['virtual_lines']) > 0 and block['virtual_lines'][0].get('index', None) is not None:
-                        for line in block['virtual_lines']:
-                            bbox = line['bbox']
-                            index = line['index']
-                            page_line_list.append({'index': index, 'bbox': bbox})
-                else:
-                    for line in block['lines']:
-                        bbox = line['bbox']
-                        index = line['index']
-                        page_line_list.append({'index': index, 'bbox': bbox})
-            elif block['type'] in [BlockType.Image, BlockType.Table]:
-                for sub_block in block['blocks']:
-                    if sub_block['type'] in [BlockType.ImageBody, BlockType.TableBody]:
-                        if len(sub_block['virtual_lines']) > 0 and sub_block['virtual_lines'][0].get('index', None) is not None:
-                            for line in sub_block['virtual_lines']:
-                                bbox = line['bbox']
-                                index = line['index']
-                                page_line_list.append({'index': index, 'bbox': bbox})
-                        else:
-                            for line in sub_block['lines']:
-                                bbox = line['bbox']
-                                index = line['index']
-                                page_line_list.append({'index': index, 'bbox': bbox})
-                    elif sub_block['type'] in [BlockType.ImageCaption, BlockType.TableCaption, BlockType.ImageFootnote, BlockType.TableFootnote]:
-                        for line in sub_block['lines']:
-                            bbox = line['bbox']
-                            index = line['index']
-                            page_line_list.append({'index': index, 'bbox': bbox})
-        sorted_bboxes = sorted(page_line_list, key=lambda x: x['index'])
-        layout_bbox_list.append(sorted_bbox['bbox'] for sorted_bbox in sorted_bboxes)
-    pdf_docs = fitz.open('pdf', pdf_bytes)
-    for i, page in enumerate(pdf_docs):
-        draw_bbox_with_number(i, layout_bbox_list, page, [255, 0, 0], False)
+#     for page in pdf_info:
+#         page_line_list = []
+#         for block in page['preproc_blocks']:
+#             if block['type'] in [BlockType.Text]:
+#                 for line in block['lines']:
+#                     bbox = line['bbox']
+#                     index = line['index']
+#                     page_line_list.append({'index': index, 'bbox': bbox})
+#             elif block['type'] in [BlockType.Title, BlockType.InterlineEquation]:
+#                 if 'virtual_lines' in block:
+#                     if len(block['virtual_lines']) > 0 and block['virtual_lines'][0].get('index', None) is not None:
+#                         for line in block['virtual_lines']:
+#                             bbox = line['bbox']
+#                             index = line['index']
+#                             page_line_list.append({'index': index, 'bbox': bbox})
+#                 else:
+#                     for line in block['lines']:
+#                         bbox = line['bbox']
+#                         index = line['index']
+#                         page_line_list.append({'index': index, 'bbox': bbox})
+#             elif block['type'] in [BlockType.Image, BlockType.Table]:
+#                 for sub_block in block['blocks']:
+#                     if sub_block['type'] in [BlockType.ImageBody, BlockType.TableBody]:
+#                         if len(sub_block['virtual_lines']) > 0 and sub_block['virtual_lines'][0].get('index', None) is not None:
+#                             for line in sub_block['virtual_lines']:
+#                                 bbox = line['bbox']
+#                                 index = line['index']
+#                                 page_line_list.append({'index': index, 'bbox': bbox})
+#                         else:
+#                             for line in sub_block['lines']:
+#                                 bbox = line['bbox']
+#                                 index = line['index']
+#                                 page_line_list.append({'index': index, 'bbox': bbox})
+#                     elif sub_block['type'] in [BlockType.ImageCaption, BlockType.TableCaption, BlockType.ImageFootnote, BlockType.TableFootnote]:
+#                         for line in sub_block['lines']:
+#                             bbox = line['bbox']
+#                             index = line['index']
+#                             page_line_list.append({'index': index, 'bbox': bbox})
+#         sorted_bboxes = sorted(page_line_list, key=lambda x: x['index'])
+#         layout_bbox_list.append(sorted_bbox['bbox'] for sorted_bbox in sorted_bboxes)
+#     pdf_docs = fitz.open('pdf', pdf_bytes)
+#     for i, page in enumerate(pdf_docs):
+#         draw_bbox_with_number(i, layout_bbox_list, page, [255, 0, 0], False)
 
-    pdf_docs.save(f'{out_path}/{filename}')
+#     pdf_docs.save(f'{out_path}/{filename}')
+### : 미사용
 
 
 def draw_char_bbox(pdf_bytes, out_path, filename):
