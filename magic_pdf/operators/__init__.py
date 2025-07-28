@@ -7,7 +7,6 @@ from magic_pdf.operators.pipes_llm import PipeResult
 
 
 class InferenceResultBase(ABC):
-
     @abstractmethod
     def __init__(self, inference_results: list, dataset: Dataset):
         """Initialized method.
