@@ -1,7 +1,7 @@
 import os
 import fitz
 from abc import ABC, abstractmethod
-from typing import Callable, Iterator
+from typing import Callable, Iterator, List
 from loguru import logger
 
 # from magic_pdf.config.enums import SupportedPdfParseMethod
@@ -140,7 +140,7 @@ class PDFDataset(Dataset):
             bits (bytes): the bytes of the pdf
         """
         self._raw_fitz = fitz.open('pdf', bits)
-        self._pages = [FitzPage(v) for v in self._raw_fitz]
+        self._pages = [FitzPage(i) for i in self._raw_fitz]
         self._data_bits = bits
         self._raw_data = bits
 
@@ -222,15 +222,21 @@ class PDFDataset(Dataset):
 
 
 class ImageDataset(Dataset):
-    def __init__(self, bits: bytes):
+    def __init__(
+        self,
+        # bits: bytes,
+        bits: List[bytes],
+    ):
         """Initialize the dataset, which wraps the pymudoc documents.
 
         Args:
             bits (bytes): the bytes of the photo which will be converted to pdf first. then converted to pymudoc.
         """
         pdf_bytes = fitz.open(stream=bits).convert_to_pdf()
+        # pdf_bytes = [fitz.open(stream=i).convert_to_pdf() for i in bits]
         self._raw_fitz = fitz.open('pdf', pdf_bytes)
-        self._pages = [FitzPage(v) for v in self._raw_fitz]
+        # self._raw_fitz = [fitz.open('pdf', i) for i in pdf_bytes]
+        self._pages = [FitzPage(i) for i in self._raw_fitz]
         self._raw_data = bits
         self._data_bits = pdf_bytes
 
@@ -301,10 +307,13 @@ class ImageDataset(Dataset):
         """
         return ImageDataset(self._raw_data)
 
+
 class FitzPage(PageableData):
     """Initialized with pymudoc object."""
-
-    def __init__(self, page: fitz.Page):
+    def __init__(
+        self,
+        page: fitz.Page,
+    ):
         self._doc = page
 
     def get_image(self) -> dict:

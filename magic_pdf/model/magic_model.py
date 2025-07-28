@@ -9,11 +9,24 @@ from magic_pdf.libs.boxbase import (
     bbox_relative_pos,
     calculate_iou,
 )
-from magic_pdf.libs.coordinate_transform import get_scale_ratio
 from magic_pdf.pre_proc.remove_bbox_overlap import _remove_overlap_between_bbox
 
 CAPATION_OVERLAP_AREA_RATIO = 0.6
 MERGE_BOX_OVERLAP_AREA_RATIO = 1.1
+
+
+def get_scale_ratio(
+    model_page_info,
+    page,
+):
+    pix = page.get_pixmap(dpi=72)
+    pymu_width = int(pix.w)
+    pymu_height = int(pix.h)
+    width_from_json = model_page_info['page_info']['width']
+    height_from_json = model_page_info['page_info']['height']
+    horizontal_scale_ratio = width_from_json / pymu_width
+    vertical_scale_ratio = height_from_json / pymu_height
+    return horizontal_scale_ratio, vertical_scale_ratio
 
 
 class PosRelationEnum(enum.Enum):
@@ -38,7 +51,8 @@ class MagicModel:
             need_remove_list = []
             page_no = model_page_info['page_info']['page_no']
             horizontal_scale_ratio, vertical_scale_ratio = get_scale_ratio(
-                model_page_info, self.__docs.get_page(page_no)
+                model_page_info,
+                self.__docs.get_page(page_no),
             )
             layout_dets = model_page_info['layout_dets']
             for layout_det in layout_dets:

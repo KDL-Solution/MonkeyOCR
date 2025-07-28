@@ -442,7 +442,6 @@ def sort(
     page_w,
     page_h,
     line_height,
-    # monkeyocr: MonkeyOCR,
     model,
 ):
     page_line_list = []
@@ -515,7 +514,6 @@ def sort(
     with torch.inference_mode():
         orders = predict_reading_order(
             boxes,
-            # model=monkeyocr.layoutreader_model,
             model=model,
         )
     sorted_bboxes = [page_line_list[i] for i in orders]
@@ -871,12 +869,10 @@ def pdf_parse_union(
     model_list,
     dataset: Dataset,
     image_writer,
-    # parse_mode,  ### 미사용.
     monkeyocr: MonkeyOCR,
     start_page_id=0,
     end_page_id=None,
     debug_mode=False,
-    # lang=None,  ### 미사용.
 ):
     pdf_bytes_md5 = compute_md5(dataset.data_bits())
 

@@ -2,19 +2,19 @@ from abc import ABC, abstractmethod
 
 
 class DataReader(ABC):
-    def read(
-        self,
-        path: str,
-    ) -> bytes:
-        """Read the file.
+    # def read(
+    #     self,
+    #     path: str,
+    # ) -> bytes:
+    #     """Read the file.
 
-        Args:
-            path (str): file path to read
+    #     Args:
+    #         path (str): file path to read
 
-        Returns:
-            bytes: the content of the file
-        """
-        return self.read_at(path)
+    #     Returns:
+    #         bytes: the content of the file
+    #     """
+    #     return self.read_at(path)
 
     @abstractmethod
     def read_at(self, path: str, offset: int = 0, limit: int = -1) -> bytes:

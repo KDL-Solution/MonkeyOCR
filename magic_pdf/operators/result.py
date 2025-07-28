@@ -9,8 +9,7 @@ from magic_pdf.config.constants import PARSE_TYPE_OCR
 from magic_pdf.data.data_reader_writer import DataWriter
 from magic_pdf.data.dataset import Dataset
 from magic_pdf.libs.version import __version__
-from MonkeyOCR.magic_pdf.pdf_parsing import pdf_parse_union
-from magic_pdf.operators import InferenceResultBase
+from magic_pdf.pdf_parsing import pdf_parse_union
 from magic_pdf.model.monkeyocr import MonkeyOCR
 from magic_pdf.config.make_content_config import DropMode, MakeMode
 from magic_pdf.dict2md.ocr_mkcontent import union_make
@@ -218,7 +217,7 @@ class PipeResult:
     ### : 미사용
 
 
-class InferenceResult(InferenceResultBase):
+class InferenceResult:
     def __init__(self, inference_results: list, dataset: Dataset):
         """Initialized method.
 

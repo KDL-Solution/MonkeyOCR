@@ -1,13 +1,18 @@
 import re
-
 from loguru import logger
 
 from magic_pdf.config.make_content_config import DropMode, MakeMode
 from magic_pdf.config.ocr_content_type import BlockType, ContentType
 from magic_pdf.libs.commons import join_path
 from magic_pdf.libs.language import detect_lang
-from magic_pdf.libs.markdown_utils import ocr_escape_special_markdown_char
 from magic_pdf.post_proc.para_split_v3 import ListLineTag
+
+
+def ocr_escape_special_markdown_char(content):
+    special_chars = ["*", "`", "~", "$"]
+    for char in special_chars:
+        content = content.replace(char, "\\" + char)
+    return content
 
 
 def __is_hyphen_at_line_end(line):

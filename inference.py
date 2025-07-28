@@ -6,13 +6,42 @@ import argparse
 import sys
 import logging
 import torch.distributed as dist
+from typing import List
+from pathlib import Path
+import fitz
 
+import sys
+sys.path.insert(0, "/home/eric/workspace/MonkeyOCR/")
 # from magic_pdf.config.chat_content_type import TaskInstructions
 from magic_pdf.data.data_reader_writer import FileBasedDataWriter, FileBasedDataReader
 from magic_pdf.data.dataset import PDFDataset, ImageDataset
 from magic_pdf.model.doc_analyze_by_custom_model_llm import doc_analyze
 from magic_pdf.model.monkeyocr import MonkeyOCR
 from magic_pdf.operators.result import InferenceResult
+
+
+def to_pdf_bytes(
+    # image_paths: List[str],
+    image_bytes_ls: List[bytes],
+) -> bytes:
+    # image_paths = [
+    #     i.as_posix()
+    #     for i in Path(input_file).glob("*")
+    #     if "@eaDir" not in i.as_posix()
+    # ]
+    # for image_path in image_paths:
+    #     _file_bytes = reader.read_at(image_path)
+    doc = fitz.open()
+    for image_bytes in image_bytes_ls:
+        pdf_bytes = fitz.open(stream=image_bytes).convert_to_pdf()
+        raw_fitz = fitz.open(
+            "pdf",
+            pdf_bytes,
+        )
+        doc.insert_pdf(
+            raw_fitz,
+        )
+    return doc.tobytes()
 
 
 def parse_file(
@@ -28,34 +57,51 @@ def parse_file(
         output_dir: Output directory
         monkeyocr: Pre-initialized model instance
     """
+    # input_file = "/mnt/AI_NAS/Data/경기도청/monkeyocr_test/재해ㆍ재난 위기대응 절차서"
+    # input_file = "/mnt/AI_NAS/Data/경기도청/경기도청_샘플데이터/RAG 구축을 위한 공통 자료/20241028_4. 개인정보처리시스템 재해ㆍ재난 위기대응 절차서/20241028_4. 개인정보처리시스템 재해ㆍ재난 위기대응 절차서_page-0016.jpg"
+    # output_dir = "/home/eric/workspace/MonkeyOCR/output/"
     print(f"Starting to parse file: {input_file}")
-    
+
     # Check if input file exists
     if not os.path.exists(input_file):
         raise FileNotFoundError(f"Input file does not exist: {input_file}")
-    
+
     # Get filename
-    name_without_suff = '.'.join(os.path.basename(input_file).split(".")[:-1])
-    
+    # name_without_suff = '.'.join(os.path.basename(input_file).split(".")[:-1])
+    name_without_suff = "<|1|>"
     # Prepare output directory
     local_image_dir = os.path.join(output_dir, name_without_suff, "images")
     local_md_dir = os.path.join(output_dir, name_without_suff)
     image_dir = os.path.basename(local_image_dir)
     os.makedirs(local_image_dir, exist_ok=True)
     os.makedirs(local_md_dir, exist_ok=True)
-    
+
     print(f"Output dir: {local_md_dir}")
     image_writer = FileBasedDataWriter(local_image_dir)
     md_writer = FileBasedDataWriter(local_md_dir)
-    reader = FileBasedDataReader()
-    file_bytes = reader.read(input_file)
 
+    reader = FileBasedDataReader()
+    # file_bytes = reader.read_at(input_file)
     # Create dataset instance
-    file_extension = input_file.split(".")[-1].lower()
-    if file_extension == "pdf":
-        ds = PDFDataset(file_bytes)
-    else:
-        ds = ImageDataset(file_bytes)
+    # file_extension = input_file.split(".")[-1].lower()
+    # if file_extension == "pdf":
+    #     ds = PDFDataset(file_bytes)
+    # else:
+    #     ds = ImageDataset(file_bytes)
+    # ds = ImageDataset(
+    #     file_bytes,
+    # )
+    image_paths = [
+        i.as_posix()
+        for i in Path(input_file).glob("*")
+        if "@eaDir" not in i.as_posix()
+    ]
+    file_bytes = to_pdf_bytes(
+        [reader.read_at(i) for i in image_paths],
+    )
+    ds = PDFDataset(
+        file_bytes,
+    )
 
     # Start inference
     print("Performing document parsing...")
@@ -78,7 +124,7 @@ def parse_file(
 
     pipe_result.draw_layout(os.path.join(local_md_dir, f"{name_without_suff}_draw_layout.pdf"))
     pipe_result.draw_span(os.path.join(local_md_dir, f"{name_without_suff}_draw_span.pdf"))
-    pipe_result.dump_markdown(md_writer, f"{name_without_suff}dump_markdown.md", image_dir)
+    pipe_result.dump_markdown(md_writer, f"{name_without_suff}_dump_markdown.md", image_dir)
     pipe_result.dump_content_list(md_writer, f"{name_without_suff}_dump_content_list.json", image_dir)
     pipe_result.dump_middle_json(md_writer, f'{name_without_suff}_dump_middle.json')
 
@@ -261,7 +307,6 @@ def parse_file(
 #         print("\nFailed files:")
 #         for file_path, error in failed_files:
 #             print(f"  - {os.path.basename(file_path)}: {error}")
-    
 #     return output_dir
 
 
@@ -316,59 +361,64 @@ Usage examples:
     )
     monkeyocr = MonkeyOCR(args.config)
     
-    try:
-        if os.path.isdir(args.input_path):
-            result_dir = parse_folder(
+    # try:
+    if os.path.isdir(args.input_path):
+        # result_dir = parse_folder(
+        #     args.input_path,
+        #     args.output,
+        #     monkeyocr,
+        #     args.task
+        # )
+        result_dir = parse_file(
+            args.input_path,
+            args.output,
+            monkeyocr
+        )
+
+        if args.task:
+            print(f"\n✅ Folder processing with single task ({args.task}) recognition completed! Results saved in: {result_dir}")
+        else:
+            print(f"\n✅ Folder processing completed! Results saved in: {result_dir}")
+    elif os.path.isfile(args.input_path):
+        print("Loading model...")
+
+        if args.task:
+            result_dir = single_task_recognition(
                 args.input_path,
                 args.output,
                 monkeyocr,
                 args.task
             )
-            
-            if args.task:
-                print(f"\n✅ Folder processing with single task ({args.task}) recognition completed! Results saved in: {result_dir}")
-            else:
-                print(f"\n✅ Folder processing completed! Results saved in: {result_dir}")
-        elif os.path.isfile(args.input_path):
-            print("Loading model...")
-
-            if args.task:
-                result_dir = single_task_recognition(
-                    args.input_path,
-                    args.output,
-                    monkeyocr,
-                    args.task
-                )
-                print(f"\n✅ Single task ({args.task}) recognition completed! Results saved in: {result_dir}")
-            else:
-                result_dir = parse_file(
-                    args.input_path,
-                    args.output,
-                    monkeyocr
-                )
-                print(f"\n✅ Parsing completed! Results saved in: {result_dir}")
+            print(f"\n✅ Single task ({args.task}) recognition completed! Results saved in: {result_dir}")
         else:
-            raise FileNotFoundError(f"Input path does not exist: {args.input_path}")
-            
-    except Exception as e:
-        print(f"\n❌ Processing failed: {str(e)}", file=sys.stderr)
-        sys.exit(1)
-    finally:
-        # Clean up resources
-        try:
-            if monkeyocr is not None:
-                # Clean up model resources if needed
-                if hasattr(monkeyocr, 'chat_model') and hasattr(monkeyocr.chat_model, 'close'):
-                    monkeyocr.chat_model.close()
+            result_dir = parse_file(
+                args.input_path,
+                args.output,
+                monkeyocr
+            )
+            print(f"\n✅ Parsing completed! Results saved in: {result_dir}")
+    else:
+        raise FileNotFoundError(f"Input path does not exist: {args.input_path}")
+
+    # except Exception as e:
+    #     print(f"\n❌ Processing failed: {str(e)}", file=sys.stderr)
+    #     sys.exit(1)
+    # finally:
+    #     # Clean up resources
+    #     try:
+    #         if monkeyocr is not None:
+    #             # Clean up model resources if needed
+    #             if hasattr(monkeyocr, 'chat_model') and hasattr(monkeyocr.chat_model, 'close'):
+    #                 monkeyocr.chat_model.close()
                     
-            # Give time for async tasks to complete before exiting
-            time.sleep(1.0)
+    #         # Give time for async tasks to complete before exiting
+    #         time.sleep(1.0)
             
-            if dist.is_initialized():
-                dist.destroy_process_group()
+    #         if dist.is_initialized():
+    #             dist.destroy_process_group()
                 
-        except Exception as cleanup_error:
-            print(f"Warning: Error during final cleanup: {cleanup_error}")
+    #     except Exception as cleanup_error:
+    #         print(f"Warning: Error during final cleanup: {cleanup_error}")
 
 
 if __name__ == "__main__":
