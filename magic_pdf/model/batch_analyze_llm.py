@@ -11,9 +11,9 @@ from docling_core.types.doc.document import DocTagsDocument, DoclingDocument
 
 from magic_pdf.config.ocr_content_type import CategoryId
 from magic_pdf.config.prompts import (
-    TaskInstructions,
+    BasePrompts,
     LoRAType,
-    LoRAInstructions,
+    LoRAPrompts,
 )
 from magic_pdf.model.sub_modules.model_utils import (
     clean_vram,
@@ -66,64 +66,64 @@ def sanitize_html(output):
 class LLMConfig:
     CATEGORY_MAPPING = {
         CategoryId.Title: {
-            "task_instruction": TaskInstructions.TEXT,
-            "LoRA_instruction": LoRAInstructions.TEXT,
+            "task_instruction": BasePrompts.TEXT,
+            "LoRA_instruction": LoRAPrompts.TEXT,
             "LoRA_type": LoRAType.BASE,
             "sanitizer": sanitize_md
         },
         CategoryId.Text: {
-            "task_instruction": TaskInstructions.TEXT,
-            "LoRA_instruction": LoRAInstructions.TEXT,
+            "task_instruction": BasePrompts.TEXT,
+            "LoRA_instruction": LoRAPrompts.TEXT,
             "LoRA_type": LoRAType.BASE,
             "sanitizer": sanitize_md
         },
         CategoryId.Abandon: {
-            "task_instruction": TaskInstructions.TEXT,
-            "LoRA_instruction": LoRAInstructions.TEXT,
+            "task_instruction": BasePrompts.TEXT,
+            "LoRA_instruction": LoRAPrompts.TEXT,
             "LoRA_type": LoRAType.BASE,
             "sanitizer": sanitize_md
         },
         CategoryId.ImageBody: {
-            "task_instruction": TaskInstructions.Image,
-            "LoRA_instruction": LoRAInstructions.Image,
+            "task_instruction": BasePrompts.Image,
+            "LoRA_instruction": LoRAPrompts.Image,
             "LoRA_type": LoRAType.BASE,
             "sanitizer": sanitize_md
         },
         CategoryId.ImageCaption: {
-            "task_instruction": TaskInstructions.TEXT,
-            "LoRA_instruction": LoRAInstructions.TEXT,
+            "task_instruction": BasePrompts.TEXT,
+            "LoRA_instruction": LoRAPrompts.TEXT,
             "LoRA_type": LoRAType.BASE,
             "sanitizer": sanitize_md
         },
         CategoryId.TableBody: {
-            "task_instruction": TaskInstructions.TABLE,
-            "LoRA_instruction": LoRAInstructions.TABLE,
+            "task_instruction": BasePrompts.TABLE,
+            "LoRA_instruction": LoRAPrompts.TABLE,
             "LoRA_type": LoRAType.TABLE,
             "sanitizer": sanitize_html
         },
         CategoryId.TableCaption: {
-            "task_instruction": TaskInstructions.TEXT,
-            "LoRA_instruction": LoRAInstructions.TEXT,
+            "task_instruction": BasePrompts.TEXT,
+            "LoRA_instruction": LoRAPrompts.TEXT,
             "LoRA_type": LoRAType.BASE,
             "sanitizer": sanitize_md
         },
         CategoryId.TableFootnote: {
-            "task_instruction": TaskInstructions.TEXT,
-            "LoRA_instruction": LoRAInstructions.TEXT,
+            "task_instruction": BasePrompts.TEXT,
+            "LoRA_instruction": LoRAPrompts.TEXT,
             "LoRA_type": LoRAType.BASE,
             "sanitizer": sanitize_md
         },
         CategoryId.InterlineEquation_Layout: {
-            "task_instruction": TaskInstructions.FORMULA,
+            "task_instruction": BasePrompts.FORMULA,
             "sanitizer": sanitize_math_formula
         },
         CategoryId.InterlineEquation_YOLO: {
-            "task_instruction": TaskInstructions.FORMULA,
+            "task_instruction": BasePrompts.FORMULA,
             "sanitizer": sanitize_math_formula
         },
         CategoryId.ImageFootnote: {
-            "task_instruction": TaskInstructions.TEXT,
-            "LoRA_instruction": LoRAInstructions.TEXT,
+            "task_instruction": BasePrompts.TEXT,
+            "LoRA_instruction": LoRAPrompts.TEXT,
             "LoRA_type": LoRAType.BASE,
             "sanitizer": sanitize_md
         },

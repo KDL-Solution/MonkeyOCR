@@ -3,7 +3,7 @@ models:
   layout_detection:
     name: doclayout_yolo
     weight: /home/eric/workspace/MonkeyOCR/model_weight/Structure/doclayout_yolo_docstructbench_imgsz1280_2501.pt
-  layout_reading:
+  relation:
     name: layoutlm_v3
     weight: /home/eric/workspace/MonkeyOCR/model_weight/Relation
   llm:

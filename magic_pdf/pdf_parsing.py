@@ -531,8 +531,7 @@ def parse_page_core(
         page_w,
         page_h,
         line_height,
-        # monkeyocr,
-        model=monkeyocr.layout_read,
+        model=monkeyocr.relation,
     )
 
     fix_blocks = _calculate_block_index(fix_blocks, sorted_bboxes)
