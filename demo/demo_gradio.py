@@ -11,7 +11,7 @@ import uuid
 
 from magic_pdf.data.data_reader_writer import FileBasedDataWriter, FileBasedDataReader
 from magic_pdf.data.dataset import PDFDataset, ImageDataset
-from magic_pdf.model.doc_analyze_by_custom_model_llm import doc_analyze
+from MonkeyOCR.magic_pdf.model.doc_analysis import doc_analyze
 from magic_pdf.model.monkeyocr import MonkeyOCR
 from PIL import Image
 from loguru import logger
@@ -232,7 +232,7 @@ if __name__ == '__main__':
             if file_ext in ['jpg', 'jpeg', 'png']:
                 # Chat directly using image file path
                 image_path = pdf_file
-                response = MonkeyOCR_model.chat_model.batch_inference([image_path], [message])[0]
+                response = MonkeyOCR_model.llm.__call__([image_path], [message])[0]
             else:
                 # PDF file processing
                 response = "Only image chat is supported, PDF file chat is not supported."

@@ -4,7 +4,7 @@ import time
 
 from magic_pdf.data.data_reader_writer import FileBasedDataWriter, FileBasedDataReader
 from magic_pdf.data.dataset import PDFDataset, ImageDataset
-from magic_pdf.model.doc_analyze_by_custom_model_llm import doc_analyze
+from MonkeyOCR.magic_pdf.model.doc_analysis import doc_analyze
 from magic_pdf.model.monkeyocr import MonkeyOCR
 import torch.distributed as dist
 

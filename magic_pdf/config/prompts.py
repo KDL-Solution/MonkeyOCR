@@ -1,7 +1,6 @@
-class LoraType:
+class LoRAType:
     BASE = "base"
     TABLE = "table_image_otsl"
-    # TEXT = "text"
 
 
 class TaskInstructions:
@@ -11,9 +10,8 @@ class TaskInstructions:
     Image = """Write a caption describing the image."""
 
 
-class LoraInstructions:
+class LoRAInstructions:
     BASE = "Please output the content from the image. Output only the extracted content, no additional text."
-    # TABLE = "Please output the table content from the image. Output only the table data, no additional text."
     TABLE = """Parse the table in the image."""
     TEXT = "Please output the text content from the image. Output only the text content, no additional text."
     Image = """Write a caption describing the image."""

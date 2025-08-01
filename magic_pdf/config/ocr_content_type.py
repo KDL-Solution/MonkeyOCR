@@ -25,16 +25,16 @@ class BlockType:
 
 
 class CategoryId:
-    Title = 0
-    Text = 1
-    Abandon = 2
+    Title = 0  # -> `OcrText`.
+    Text = 1  # -> `OcrText`.
+    Abandon = 2  # -> `OcrText`.
     ImageBody = 3
-    ImageCaption = 4
+    ImageCaption = 4  # -> `OcrText`.
     TableBody = 5
-    TableCaption = 6
-    TableFootnote = 7
-    InterlineEquation_Layout = 8
+    TableCaption = 6  # -> `OcrText`.
+    TableFootnote = 7  # -> `OcrText`.
+    InterlineEquation_Layout = 8  # -> `InterlineEquation_Layout`.
     # InlineEquation = 13
-    InterlineEquation_YOLO = 14
+    InterlineEquation_YOLO = 14  # -> `InterlineEquation_Layout`.
     OcrText = 15
-    ImageFootnote = 101
+    ImageFootnote = 101  # -> `OcrText`.

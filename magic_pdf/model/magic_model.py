@@ -1,4 +1,5 @@
 import enum
+from typing import List
 
 from magic_pdf.config.model_block_type import ModelBlockTypeEnum
 from magic_pdf.config.ocr_content_type import CategoryId, ContentType
@@ -38,14 +39,18 @@ class PosRelationEnum(enum.Enum):
 
 
 class MagicModel:
-    def __init__(self, model_list: list, docs: Dataset):
+    def __init__(
+        self,
+        model_list: List,
+        dataset: Dataset,
+    ):
         self.__model_list = model_list
-        self.__docs = docs
+        self.__docs = dataset
         self.__fix_axis()
         self.__fix_by_remove_low_confidence()
         self.__fix_by_remove_high_iou_and_low_confidence()
         self.__fix_footnote()
-        
+
     def __fix_axis(self):
         for model_page_info in self.__model_list:
             need_remove_list = []
@@ -142,7 +147,6 @@ class MagicModel:
 
         if l2 > l1 and (l2 - l1) / l1 > 0.3:
             return float('inf')
-
         return bbox_distance(bbox1, bbox2)
 
     def __fix_footnote(self):
@@ -482,6 +486,9 @@ class MagicModel:
             ret.append(record)
         return ret
 
+    # def get_imgs(self, page_no: int):
+    #     return self.get_imgs_v2(page_no)
+
     def get_tables_v2(self, page_no: int) -> list:
         with_captions = self.__tie_up_category_by_distance_v2(
             page_no, 5, 6, PosRelationEnum.UP
@@ -501,13 +508,37 @@ class MagicModel:
             ret.append(record)
         return ret
 
-    def get_imgs(self, page_no: int):
-        return self.get_imgs_v2(page_no)
+    # def get_tables(
+    #     self, page_no: int
+    # ) -> list:
+    #     return self.get_tables_v2(page_no)
 
-    def get_tables(
-        self, page_no: int
+    def __get_blocks_by_type(
+        self, type: int, page_no: int, extra_col: list[str] = []
     ) -> list:
-        return self.get_tables_v2(page_no)
+        blocks = []
+        for page_dict in self.__model_list:
+            layout_dets = page_dict.get('layout_dets', [])
+            page_info = page_dict.get('page_info', {})
+            page_number = page_info.get('page_no', -1)
+            if page_no != page_number:
+                continue
+            for item in layout_dets:
+                category_id = item.get('category_id', -1)
+                bbox = item.get('bbox', None)
+
+                if category_id == type:
+                    block = {
+                        'bbox': bbox,
+                        'score': item.get('score'),
+                    }
+                    for col in extra_col:
+                        block[col] = item.get(col, None)
+                    blocks.append(block)
+        return blocks
+
+    def get_model_list(self, page_no):
+        return self.__model_list[page_no]
 
     def get_equations(self, page_no: int) -> list:
         inline_equations = self.__get_blocks_by_type(
@@ -533,21 +564,20 @@ class MagicModel:
         blocks = self.__get_blocks_by_type(ModelBlockTypeEnum.TITLE.value, page_no)
         return blocks
 
-    def get_ocr_text(self, page_no: int) -> list:
-        text_spans = []
-        model_page_info = self.__model_list[page_no]
-        layout_dets = model_page_info['layout_dets']
-        for layout_det in layout_dets:
-            if layout_det['category_id'] == '15':
-                span = {
-                    'bbox': layout_det['bbox'],
-                    'content': layout_det['text'],
-                }
-                text_spans.append(span)
-        return text_spans
+    # def get_ocr_text(self, page_no: int) -> list:
+    #     text_spans = []
+    #     model_page_info = self.__model_list[page_no]
+    #     layout_dets = model_page_info['layout_dets']
+    #     for layout_det in layout_dets:
+    #         if layout_det['category_id'] == '15':
+    #             span = {
+    #                 'bbox': layout_det['bbox'],
+    #                 'content': layout_det['text'],
+    #             }
+    #             text_spans.append(span)
+    #     return text_spans
 
     def get_all_spans(self, page_no: int) -> list:
-
         def remove_duplicate_spans(spans):
             new_spans = []
             for span in spans:
@@ -559,10 +589,6 @@ class MagicModel:
         model_page_info = self.__model_list[page_no]
         layout_dets = model_page_info['layout_dets']
         allow_category_id_list = [3, 5, 13, 14, 15]
-
-
-
-
 
         for layout_det in layout_dets:
             category_id = layout_det['category_id']
@@ -592,36 +618,7 @@ class MagicModel:
         return remove_duplicate_spans(all_spans)
 
     def get_page_size(self, page_no: int):
-
         page = self.__docs.get_page(page_no).get_page_info()
-
         page_w = page.w
         page_h = page.h
         return page_w, page_h
-
-    def __get_blocks_by_type(
-        self, type: int, page_no: int, extra_col: list[str] = []
-    ) -> list:
-        blocks = []
-        for page_dict in self.__model_list:
-            layout_dets = page_dict.get('layout_dets', [])
-            page_info = page_dict.get('page_info', {})
-            page_number = page_info.get('page_no', -1)
-            if page_no != page_number:
-                continue
-            for item in layout_dets:
-                category_id = item.get('category_id', -1)
-                bbox = item.get('bbox', None)
-
-                if category_id == type:
-                    block = {
-                        'bbox': bbox,
-                        'score': item.get('score'),
-                    }
-                    for col in extra_col:
-                        block[col] = item.get(col, None)
-                    blocks.append(block)
-        return blocks
-
-    def get_model_list(self, page_no):
-        return self.__model_list[page_no]

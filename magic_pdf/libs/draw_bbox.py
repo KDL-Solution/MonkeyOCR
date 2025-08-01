@@ -1,7 +1,10 @@
 import fitz
 from magic_pdf.config.constants import CROSS_PAGE
-from magic_pdf.config.ocr_content_type import (BlockType, CategoryId,
-                                               ContentType)
+from magic_pdf.config.ocr_content_type import (
+    BlockType,
+    CategoryId,
+    ContentType,
+)
 from magic_pdf.data.dataset import Dataset
 from magic_pdf.model.magic_model import MagicModel
 
@@ -286,7 +289,12 @@ def draw_span_bbox(pdf_info, pdf_bytes, out_path, filename):
     pdf_docs.save(f'{out_path}/{filename}')
 
 
-def draw_model_bbox(model_list, dataset: Dataset, out_path, filename):
+def draw_model_bbox(
+    model_list,
+    dataset: Dataset,
+    out_path,
+    filename,
+):
     dropped_bbox_list = []
     tables_body_list, tables_caption_list, tables_footnote_list = [], [], []
     imgs_body_list, imgs_caption_list, imgs_footnote_list = [], [], []

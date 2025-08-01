@@ -2,7 +2,7 @@ import torch
 from loguru import logger
 
 from magic_pdf.config.constants import MODEL_NAME
-from magic_pdf.model.sub_modules.layout.doclayout_yolo.DocLayoutYOLO import DocLayoutYOLOModel
+from magic_pdf.model.sub_modules.layout_detection.doclayout_yolo import DocLayoutYOLO
 
 
 class AtomicModel:
@@ -12,7 +12,7 @@ class AtomicModel:
 def doclayout_yolo_model_init(weight, device='cpu'):
     if str(device).startswith("npu"):
         device = torch.device(device)
-    model = DocLayoutYOLOModel(weight, device)
+    model = DocLayoutYOLO(weight, device)
     return model
 
 
