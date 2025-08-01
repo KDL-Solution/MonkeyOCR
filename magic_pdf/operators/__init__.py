@@ -3,7 +3,7 @@ from typing import Callable
 
 from magic_pdf.data.data_reader_writer import DataWriter
 from magic_pdf.data.dataset import Dataset
-from magic_pdf.operators.pipes_llm import PipeResult
+from magic_pdf.operators.result import PipeResult
 
 
 class InferenceResultBase(ABC):
