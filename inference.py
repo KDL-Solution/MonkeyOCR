@@ -17,7 +17,7 @@ from magic_pdf.data.data_reader_writer import FileBasedDataWriter, FileBasedData
 from magic_pdf.data.dataset import PDFDataset, ImageDataset
 from magic_pdf.model.doc_analysis import doc_analyze
 from magic_pdf.model.monkeyocr import MonkeyOCR
-from magic_pdf.operators.result import InferenceResult
+# from magic_pdf.operators.result import InferenceResult
 
 
 def to_pdf_bytes(

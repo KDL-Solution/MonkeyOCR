@@ -66,65 +66,65 @@ def sanitize_html(output):
 class LLMConfig:
     CATEGORY_MAPPING = {
         CategoryId.Title: {
-            "task_instruction": BasePrompts.TEXT,
-            "LoRA_instruction": LoRAPrompts.TEXT,
-            "LoRA_type": LoRAType.BASE,
+            "base_prompt": BasePrompts.TEXT,
+            "lora_prompt": LoRAPrompts.TEXT,
+            "lora_type": LoRAType.BASE,
             "sanitizer": sanitize_md
         },
         CategoryId.Text: {
-            "task_instruction": BasePrompts.TEXT,
-            "LoRA_instruction": LoRAPrompts.TEXT,
-            "LoRA_type": LoRAType.BASE,
+            "base_prompt": BasePrompts.TEXT,
+            "lora_prompt": LoRAPrompts.TEXT,
+            "lora_type": LoRAType.BASE,
             "sanitizer": sanitize_md
         },
         CategoryId.Abandon: {
-            "task_instruction": BasePrompts.TEXT,
-            "LoRA_instruction": LoRAPrompts.TEXT,
-            "LoRA_type": LoRAType.BASE,
+            "base_prompt": BasePrompts.TEXT,
+            "lora_prompt": LoRAPrompts.TEXT,
+            "lora_type": LoRAType.BASE,
             "sanitizer": sanitize_md
         },
         CategoryId.ImageBody: {
-            "task_instruction": BasePrompts.Image,
-            "LoRA_instruction": LoRAPrompts.Image,
-            "LoRA_type": LoRAType.BASE,
+            "base_prompt": BasePrompts.Image,
+            "lora_prompt": LoRAPrompts.Image,
+            "lora_type": LoRAType.BASE,
             "sanitizer": sanitize_md
         },
         CategoryId.ImageCaption: {
-            "task_instruction": BasePrompts.TEXT,
-            "LoRA_instruction": LoRAPrompts.TEXT,
-            "LoRA_type": LoRAType.BASE,
+            "base_prompt": BasePrompts.TEXT,
+            "lora_prompt": LoRAPrompts.TEXT,
+            "lora_type": LoRAType.BASE,
             "sanitizer": sanitize_md
         },
         CategoryId.TableBody: {
-            "task_instruction": BasePrompts.TABLE,
-            "LoRA_instruction": LoRAPrompts.TABLE,
-            "LoRA_type": LoRAType.TABLE,
+            "base_prompt": BasePrompts.TABLE,
+            "lora_prompt": LoRAPrompts.TABLE,
+            "lora_type": LoRAType.TABLE,
             "sanitizer": sanitize_html
         },
         CategoryId.TableCaption: {
-            "task_instruction": BasePrompts.TEXT,
-            "LoRA_instruction": LoRAPrompts.TEXT,
-            "LoRA_type": LoRAType.BASE,
+            "base_prompt": BasePrompts.TEXT,
+            "lora_prompt": LoRAPrompts.TEXT,
+            "lora_type": LoRAType.BASE,
             "sanitizer": sanitize_md
         },
         CategoryId.TableFootnote: {
-            "task_instruction": BasePrompts.TEXT,
-            "LoRA_instruction": LoRAPrompts.TEXT,
-            "LoRA_type": LoRAType.BASE,
+            "base_prompt": BasePrompts.TEXT,
+            "lora_prompt": LoRAPrompts.TEXT,
+            "lora_type": LoRAType.BASE,
             "sanitizer": sanitize_md
         },
         CategoryId.InterlineEquation_Layout: {
-            "task_instruction": BasePrompts.FORMULA,
+            "base_prompt": BasePrompts.FORMULA,
             "sanitizer": sanitize_math_formula
         },
         CategoryId.InterlineEquation_YOLO: {
-            "task_instruction": BasePrompts.FORMULA,
+            "base_prompt": BasePrompts.FORMULA,
             "sanitizer": sanitize_math_formula
         },
         CategoryId.ImageFootnote: {
-            "task_instruction": BasePrompts.TEXT,
-            "LoRA_instruction": LoRAPrompts.TEXT,
-            "LoRA_type": LoRAType.BASE,
+            "base_prompt": BasePrompts.TEXT,
+            "lora_prompt": LoRAPrompts.TEXT,
+            "lora_type": LoRAType.BASE,
             "sanitizer": sanitize_md
         },
     }
@@ -135,14 +135,14 @@ class LLMConfig:
         mapping = cls.CATEGORY_MAPPING.get(category_id, {})
 
         if version == "LoRA":  
-            return mapping.get("LoRA_instruction")
+            return mapping.get("lora_prompt")
         else: 
-            return mapping.get("task_instruction")
+            return mapping.get("base_prompt")
 
     @classmethod
-    def get_LoRA_type(cls, category_id):
+    def get_lora_type(cls, category_id):
         """CategoryId에 해당하는 LoRA 타입 반환"""
-        return cls.CATEGORY_MAPPING.get(category_id, {}).get("LoRA_type", LoRAType.BASE)
+        return cls.CATEGORY_MAPPING.get(category_id, {}).get("lora_type", LoRAType.BASE)
 
     @classmethod
     def get_sanitizer(cls, category_id):
@@ -157,7 +157,7 @@ class LLMConfig:
     @classmethod
     def is_LoRA_supported(cls, category_id):
         """CategoryId에 해당하는 LoRA가 지원되는지 확인"""
-        return cls.get_LoRA_type(category_id) != LoRAType.BASE and cls.is_supported(category_id)
+        return cls.get_lora_type(category_id) != LoRAType.BASE and cls.is_supported(category_id)
 
 
 class InferenceBatch:
@@ -263,13 +263,12 @@ class InferenceBatch:
         self,
         images,
         cat_ids,
-        # max_batch_size=8,  # 미사용.
     ) -> List[str]:
         assert len(images) == len(cat_ids)
 
         new_images = []
         user_prompts = []
-        model_types = []
+        lora_names = []
         ignore_idx = []
         outs = []
         for i in range(len(images)):
@@ -290,20 +289,20 @@ class InferenceBatch:
                         version="LoRA",
                     )
                 )
-                LoRA_type = LLMConfig.get_LoRA_type(cat_id)
-                model_types.append(LoRA_type)
+                lora_type = LLMConfig.get_lora_type(cat_id)
+                lora_names.append(lora_type)
             else:
                 user_prompts.append(
                     LLMConfig.get_instruction(
                         cat_id,
                     ),
                 )
-                model_types.append(LoRAType.BASE)
+                lora_names.append(LoRAType.BASE)
 
         out = self.monkeyocr.llm(
             images=new_images,
             user_prompts=user_prompts,
-            model_types=model_types,
+            lora_names=lora_names,
         )
         outs.extend(out)
 
