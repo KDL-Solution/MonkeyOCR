@@ -185,8 +185,7 @@ class GroupedLLM:
             raise ValueError("lora_names length must match images length")
 
         # 모델별로 그룹핑
-        # groups = defaultdict(lambda: defaultdict(list))
-        groups = {}
+        groups = defaultdict(lambda: defaultdict(list))
         for i, (image, user_prompt, lora_name) in enumerate(
             zip(
                 images,
@@ -194,12 +193,6 @@ class GroupedLLM:
                 lora_names,
             ),
         ):
-            if lora_name not in groups:
-                groups[lora_name] = {
-                    "images": [],
-                    "user_prompts": [],
-                    "indices": [],
-                }
             groups[lora_name]["images"].append(image)
             groups[lora_name]["user_prompts"].append(user_prompt)
             groups[lora_name]["indices"].append(i)
