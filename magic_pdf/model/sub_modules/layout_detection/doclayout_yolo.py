@@ -8,29 +8,6 @@ class DocLayoutYOLO(object):
         self.yolov10 = YOLOv10(weight)
         self.device = device
 
-    # def predict(self, image):
-    #     layout_res = []
-    #     doclayout_yolo_res = self.yolov10.predict(
-    #         image,
-    #         imgsz=1280,
-    #         conf=0.10,
-    #         iou=0.45,
-    #         verbose=False, device=self.device
-    #     )[0]
-    #     for xyxy, conf, cla in zip(
-    #         doclayout_yolo_res.boxes.xyxy.cpu(),
-    #         doclayout_yolo_res.boxes.conf.cpu(),
-    #         doclayout_yolo_res.boxes.cls.cpu(),
-    #     ):
-    #         xmin, ymin, xmax, ymax = [int(p.item()) for p in xyxy]
-    #         new_item = {
-    #             "category_id": int(cla.item()),
-    #             "poly": [xmin, ymin, xmax, ymin, xmax, ymax, xmin, ymax],
-    #             "score": round(float(conf.item()), 3),
-    #         }
-    #         layout_res.append(new_item)
-    #     return layout_res
-
     def __call__(
         self,
         images: List[Image.Image],
