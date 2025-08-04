@@ -1,18 +1,12 @@
 import copy
 import statistics
 import time
-from typing import List
 import torch
-from loguru import logger
+import hashlib
 import numpy as np
+from typing import List
+from loguru import logger
 
-
-# import math
-# import re
-# import os
-# import fitz
-
-# from magic_pdf.config.enums import SupportedPdfParseMethod
 from magic_pdf.config.ocr_content_type import BlockType, ContentType
 from magic_pdf.data.dataset import Dataset, PageableData
 from magic_pdf.libs.boxbase import (
@@ -20,8 +14,6 @@ from magic_pdf.libs.boxbase import (
     __is_overlaps_y_exceeds_threshold,
 )
 from magic_pdf.libs.clean_memory import clean_memory
-from magic_pdf.libs.convert_utils import dict_to_list
-from magic_pdf.libs.hash_utils import compute_md5
 from magic_pdf.model.magic_model import MagicModel
 from magic_pdf.post_proc.para_split_v3 import para_split
 from magic_pdf.pre_proc.cut_image import ocr_cut_image_and_table
@@ -35,7 +27,6 @@ from magic_pdf.pre_proc.ocr_span_list_modify import (
     get_qa_need_list_v2,
     remove_overlaps_low_confidence_spans,
     remove_overlaps_min_spans,
-    # check_chars_is_overlap_in_span,
 )
 from magic_pdf.model.monkeyocr import MonkeyOCR
 from magic_pdf.model.sub_modules.reading_order.layoutreader.xycut import recursive_xy_cut
@@ -46,7 +37,20 @@ from magic_pdf.model.sub_modules.reading_order.layoutreader.helpers import (
 )
 
 
-def ocr_construct_page_component_v2(
+def compute_md5(file_bytes):
+    hasher = hashlib.md5()
+    hasher.update(file_bytes)
+    return hasher.hexdigest().upper()
+
+
+def _dict_to_list(input_dict):
+    items_list = []
+    for _, item in input_dict.items():
+        items_list.append(item)
+    return items_list
+
+
+def ocr_construct_page_component(
     blocks,
     layout_bboxes,
     page_id,
@@ -501,7 +505,7 @@ def parse_page_core(
 
     if len(all_bboxes) == 0:
         logger.warning(f"skip this page, not found useful bbox, page_id: {page_id}")
-        return ocr_construct_page_component_v2(
+        return ocr_construct_page_component(
             [],
             [],
             page_id,
@@ -546,7 +550,7 @@ def parse_page_core(
 
     images, tables, interline_equations = get_qa_need_list_v2(sorted_blocks)
 
-    page_info = ocr_construct_page_component_v2(
+    page_info = ocr_construct_page_component(
         sorted_blocks,
         [],
         page_id,
@@ -607,15 +611,13 @@ def pdf_parse_union(
                 page_id,
                 pdf_bytes_md5,
                 image_writer,
-                # parse_mode,
-                # lang,
                 monkeyocr,
             )
         else:
             page_info = page.get_page_info()
             page_w = page_info.w
             page_h = page_info.h
-            page_info = ocr_construct_page_component_v2(
+            page_info = ocr_construct_page_component(
                 [],
                 [],
                 page_id,
@@ -633,7 +635,7 @@ def pdf_parse_union(
 
     para_split(pdf_info_dict)
 
-    pdf_info_list = dict_to_list(pdf_info_dict)
+    pdf_info_list = _dict_to_list(pdf_info_dict)
     new_pdf_info_dict = {
         "pdf_info": pdf_info_list,
     }

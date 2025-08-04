@@ -8,7 +8,7 @@ from magic_pdf.libs.language import detect_lang
 from magic_pdf.post_proc.para_split_v3 import ListLineTag
 
 
-def ocr_escape_special_markdown_char(content):
+def _ocr_escape_special_markdown_char(content):
     special_chars = ["*", "`", "~", "$"]
     for char in special_chars:
         content = content.replace(char, "\\" + char)
@@ -28,7 +28,7 @@ def __is_hyphen_at_line_end(line):
     return bool(re.search(r"[A-Za-z]+-\s*$", line))
 
 
-def get_title_level(block):
+def _get_title_level(block):
     title_level = block.get("level", 1)
     if title_level > 4:
         title_level = 4
@@ -37,7 +37,7 @@ def get_title_level(block):
     return title_level
 
 
-def ocr_mk_markdown_with_para_core_v2(
+def _ocr_mk_markdown_with_para_core(
     paras_of_layout,
     mode,
     img_buket_path="",
@@ -51,12 +51,12 @@ def ocr_mk_markdown_with_para_core_v2(
             BlockType.List,
             BlockType.Index,
         ]:
-            para_text = merge_para_with_text(para_block)
+            para_text = _merge_para_with_text(para_block)
         elif para_type == BlockType.Title:
-            title_level = get_title_level(para_block)
-            para_text = f"""{"#" * title_level} {merge_para_with_text(para_block)}"""
+            title_level = _get_title_level(para_block)
+            para_text = f"""{"#" * title_level} {_merge_para_with_text(para_block)}"""
         elif para_type == BlockType.InterlineEquation:
-            para_text = merge_para_with_text(para_block)
+            para_text = _merge_para_with_text(para_block)
         elif para_type == BlockType.Image:
             if mode == MakeMode.NLP_MD:
                 continue
@@ -70,17 +70,17 @@ def ocr_mk_markdown_with_para_core_v2(
                                         para_text += f"""\n![]({join_path(img_buket_path, span["image_path"])})  \n"""
                 for block in para_block["blocks"]:
                     if block["type"] == BlockType.ImageCaption:
-                        para_text += merge_para_with_text(block) + "  \n"
+                        para_text += _merge_para_with_text(block) + "  \n"
                 for block in para_block["blocks"]:
                     if block["type"] == BlockType.ImageFootnote:
-                        para_text += merge_para_with_text(block) + "  \n"
+                        para_text += _merge_para_with_text(block) + "  \n"
         elif para_type == BlockType.Table:
             if mode == MakeMode.NLP_MD:
                 continue
             elif mode == MakeMode.MM_MD:
                 for block in para_block["blocks"]:
                     if block["type"] == BlockType.TableCaption:
-                        para_text += merge_para_with_text(block) + "  \n"
+                        para_text += _merge_para_with_text(block) + "  \n"
                 for block in para_block["blocks"]:
                     if block["type"] == BlockType.TableBody:
                         for line in block["lines"]:
@@ -95,7 +95,7 @@ def ocr_mk_markdown_with_para_core_v2(
                                         para_text += f"\n![]({join_path(img_buket_path, span['image_path'])})  \n"
                 for block in para_block["blocks"]:
                     if block["type"] == BlockType.TableFootnote:
-                        para_text += merge_para_with_text(block) + "  \n"
+                        para_text += _merge_para_with_text(block) + "  \n"
 
         if para_text.strip() == "":
             continue
@@ -105,20 +105,7 @@ def ocr_mk_markdown_with_para_core_v2(
     return page_markdown
 
 
-# def detect_language(text):
-#     en_pattern = r"[a-zA-Z]+"
-#     en_matches = re.findall(en_pattern, text)
-#     en_length = sum(len(match) for match in en_matches)
-#     if len(text) > 0:
-#         if en_length / len(text) >= 0.5:
-#             return "en"
-#         else:
-#             return "unknown"
-#     else:
-#         return "empty"
-
-
-def merge_para_with_text(para_block):
+def _merge_para_with_text(para_block):
     block_text = ""
     for line in para_block["lines"]:
         for span in line["spans"]:
@@ -137,7 +124,7 @@ def merge_para_with_text(para_block):
             span_type = span["type"]
             content = ""
             if span_type == ContentType.Text:
-                content = ocr_escape_special_markdown_char(span["content"])
+                content = _ocr_escape_special_markdown_char(span["content"])
             elif span_type == ContentType.InlineEquation:
                 content = f"${span['content']}$"
             elif span_type == ContentType.InterlineEquation:
@@ -169,7 +156,7 @@ def merge_para_with_text(para_block):
     return para_text
 
 
-def para_to_standard_format_v2(
+def _para_to_standard_format(
     para_block,
     img_buket_path,
     page_idx,
@@ -180,19 +167,19 @@ def para_to_standard_format_v2(
     if para_type in [BlockType.Text, BlockType.List, BlockType.Index]:
         para_content = {
             "type": "text",
-            "text": merge_para_with_text(para_block),
+            "text": _merge_para_with_text(para_block),
         }
     elif para_type == BlockType.Title:
-        title_level = get_title_level(para_block)
+        title_level = _get_title_level(para_block)
         para_content = {
             "type": "text",
-            "text": merge_para_with_text(para_block),
+            "text": _merge_para_with_text(para_block),
             "text_level": title_level,
         }
     elif para_type == BlockType.InterlineEquation:
         para_content = {
             "type": "equation",
-            "text": merge_para_with_text(para_block),
+            "text": _merge_para_with_text(para_block),
             "text_format": "latex",
         }
     elif para_type == BlockType.Image:
@@ -205,9 +192,9 @@ def para_to_standard_format_v2(
                             if span.get("image_path", ""):
                                 para_content["img_path"] = join_path(img_buket_path, span["image_path"])
             if block["type"] == BlockType.ImageCaption:
-                para_content["img_caption"].append(merge_para_with_text(block))
+                para_content["img_caption"].append(_merge_para_with_text(block))
             if block["type"] == BlockType.ImageFootnote:
-                para_content["img_footnote"].append(merge_para_with_text(block))
+                para_content["img_footnote"].append(_merge_para_with_text(block))
     elif para_type == BlockType.Table:
         para_content = {
             "type": "table",
@@ -230,9 +217,9 @@ def para_to_standard_format_v2(
                                 para_content["img_path"] = join_path(img_buket_path, span["image_path"])
 
             if block["type"] == BlockType.TableCaption:
-                para_content["table_caption"].append(merge_para_with_text(block))
+                para_content["table_caption"].append(_merge_para_with_text(block))
             if block["type"] == BlockType.TableFootnote:
-                para_content["table_footnote"].append(merge_para_with_text(block))
+                para_content["table_footnote"].append(_merge_para_with_text(block))
 
     para_content["page_idx"] = page_idx
 
@@ -250,14 +237,11 @@ def union_make(
 ):
     output_content = []
     for page_info in pdf_info_dict:
-        drop_reason_flag = False
         drop_reason = None
         if page_info.get("need_drop", False):
             drop_reason = page_info.get("drop_reason")
             if drop_mode == DropMode.NONE:
                 pass
-            elif drop_mode == DropMode.NONE_WITH_REASON:
-                drop_reason_flag = True
             elif drop_mode == DropMode.WHOLE_PDF:
                 raise Exception((f"drop_mode is {DropMode.WHOLE_PDF} ,"
                                  f"drop_reason is {drop_reason}"))
@@ -273,39 +257,25 @@ def union_make(
         if not paras_of_layout:
             continue
         if make_mode == MakeMode.MM_MD:
-            page_markdown = ocr_mk_markdown_with_para_core_v2(
+            page_markdown = _ocr_mk_markdown_with_para_core(
                 paras_of_layout,
                 mode=MakeMode.MM_MD,
                 img_buket_path=img_buket_path,
             )
             output_content.extend(page_markdown)
         elif make_mode == MakeMode.NLP_MD:
-            page_markdown = ocr_mk_markdown_with_para_core_v2(
+            page_markdown = _ocr_mk_markdown_with_para_core(
                 paras_of_layout,
                 mode=MakeMode.NLP_MD,
             )
             output_content.extend(page_markdown)
         elif make_mode == MakeMode.STANDARD_FORMAT:
             for para_block in paras_of_layout:
-                para_content = para_to_standard_format_v2(
+                para_content = _para_to_standard_format(
                     para_block,
                     img_buket_path,
                     page_idx,
                 )
-                ### 미사용:
-                # if drop_reason_flag:
-                #     para_content = para_to_standard_format_v2(
-                #         para_block,
-                #         img_buket_path,
-                #         page_idx,
-                #     )
-                # else:
-                #     para_content = para_to_standard_format_v2(
-                #         para_block,
-                #         img_buket_path,
-                #         page_idx,
-                #     )
-                ### : 미사용
                 output_content.append(para_content)
 
     if make_mode in [
@@ -315,32 +285,3 @@ def union_make(
         return "\n\n".join(output_content)  # `str`.
     elif make_mode == MakeMode.STANDARD_FORMAT:
         return output_content
-
-
-# def ocr_mk_mm_markdown_with_para_and_pagination(
-#     pdf_info_dict: list,
-#     img_buket_path,
-# ):
-#     markdown_with_para_and_pagination = []
-#     page_no = 0
-#     for page_info in pdf_info_dict:
-#         paras_of_layout = page_info.get("para_blocks")
-#         if not paras_of_layout:
-#             markdown_with_para_and_pagination.append({
-#                 "page_no":
-#                     page_no,
-#                 "md_content":
-#                     "",
-#             })
-#             page_no += 1
-#             continue
-#         page_markdown = ocr_mk_markdown_with_para_core_v2(
-#             paras_of_layout, "mm", img_buket_path)
-#         markdown_with_para_and_pagination.append({
-#             "page_no":
-#                 page_no,
-#             "md_content":
-#                 "\n\n".join(page_markdown)
-#         })
-#         page_no += 1
-#     return markdown_with_para_and_pagination
