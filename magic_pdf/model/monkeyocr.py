@@ -9,7 +9,6 @@ from openai import OpenAI, AsyncOpenAI
 from collections import defaultdict
 from transformers import LayoutLMv3ForTokenClassification
 
-from magic_pdf.config.prompts import LoRAType
 from magic_pdf.utils.load_image import load_image
 from magic_pdf.model.sub_modules.layout_detection.doclayout_yolo import DocLayoutYOLO
 
@@ -18,12 +17,12 @@ class LLM:
     def __init__(
         self,
         url: str,
-        model_name: str,
+        name: str,
         api_key: str = "EMPTY",
         max_tokens: int = 4096,
         temperature: float = 0.
     ):
-        self.model_name = model_name
+        self.model = name
         self.base_url = url
         self.api_key = api_key
         self.max_tokens = max_tokens
@@ -34,7 +33,7 @@ class LLM:
             _client = OpenAI(base_url=url, api_key=api_key)
             response = _client.models.list()
             if not response.data:
-                raise ValueError(f"No models found for model name: {self.model_name}")
+                raise ValueError(f"No models found for model name: {self.model}")
             # logger.info("API connection validated successfully.")
         except Exception as e:
             logger.error(f"API connection validation failed: {e}")
@@ -82,16 +81,11 @@ class LLM:
             ]
             # API 호출
             model_out = await client.chat.completions.create(
-                model=self.model_name,
+                model=self.model,
                 messages=messages,
                 max_tokens=self.max_tokens,
                 temperature=self.temperature
             )
-            # print(self.model_name)
-            # print(messages[1]["content"][1]["text"])
-            # if self.model_name == "table_image_otsl":
-            #     print(messages[1]["content"][1]["text"])
-                # print(model_out.choices[0].message.content)
             return model_out.choices[0].message.content
 
         except Exception as e:
@@ -103,7 +97,7 @@ class LLM:
         images,
         user_prompts,
     ):
-        logger.info(f"{self.model_name} - Processing batch inference with {len(images)} images and user prompts.")
+        logger.info(f"{self.model} - Processing batch inference with {len(images)} images and user prompts.")
         if len(images) != len(user_prompts):
             raise ValueError("Images and user prompts must have the same length")
         
@@ -133,85 +127,64 @@ class LLM:
 class GroupedLLM:
     def __init__(
         self,
-        url: str,
-        model_name: str,
-        loras: Dict[str, str],
+        models: List[Dict[str, str]],
         api_key: str = "EMPTY",
     ):
-        self.model_name = model_name
-
-        self.base_model = LLM(
-            url=url,
-            model_name=model_name,
-            api_key=api_key
-        )
-        self.lora_models = {}
-        for lora_name, lora_model in loras.items():
-            logger.info(f"Loading LoRA model: {lora_name} -> {lora_model}")
-            self.lora_models[lora_name] = LLM(
-                url=url,
-                model_name=lora_model,
-                api_key=api_key
-            )
+        self.llms = {
+            i["name"]: LLM(
+                name=i["name"],
+                url=i["url"],
+                api_key=api_key,
+            ) for i in models
+        }
 
     def get_available_models(
         self,
     ) -> List[str]:
-        return [LoRAType.BASE] + list(self.lora_models.keys())
+        return list(self.llms.keys())
 
     async def _infer_async_batch(
         self,
         images,
         user_prompts,
-        lora_names: List = None,
+        model_names: List[str],
     ) -> List[str]:
         async def _infer(
-            lora_name: str,
+            model_name: str,
             group,
         ):
-            if lora_name == LoRAType.BASE or lora_name not in self.lora_models:
-                _model = self.base_model
-            else:
-                _model = self.lora_models[lora_name]
-            return await _model(
+            return await self.llms[model_name](
                 images=group["images"],
                 user_prompts=group["user_prompts"],
             )
 
-        if lora_names is None:
-            lora_names = [LoRAType.BASE] * len(images)
-        
-        if len(lora_names) != len(images):
-            raise ValueError("lora_names length must match images length")
+        if len(model_names) != len(images):
+            raise ValueError("model_names length must match images length")
 
         # 모델별로 그룹핑
         groups = defaultdict(lambda: defaultdict(list))
-        for i, (image, user_prompt, lora_name) in enumerate(
+        for i, (image, user_prompt, model_name) in enumerate(
             zip(
                 images,
                 user_prompts,
-                lora_names,
+                model_names,
             ),
         ):
-            groups[lora_name]["images"].append(image)
-            groups[lora_name]["user_prompts"].append(user_prompt)
-            groups[lora_name]["indices"].append(i)
+            groups[model_name]["images"].append(image)
+            groups[model_name]["user_prompts"].append(user_prompt)
+            groups[model_name]["indices"].append(i)
 
-        # for lora_name in lora_names:
-        #     print(lora_name)
-        #     for i in groups[lora_name]["user_prompts"]:
-        #         print(i)
         # 모든 그룹을 동시에 처리
         group_tasks = [
             (
-                lora_name,
+                model_name,
                 group,
                 _infer(
-                    lora_name=lora_name,
+                    model_name=model_name,
                     group=group,
                 )
             )
-            for lora_name, group in groups.items()
+            for model_name, group in groups.items()
         ]
         # 🚀 동시 실행!
         group_results = await asyncio.gather(
@@ -219,7 +192,7 @@ class GroupedLLM:
         )
         # 원래 순서로 결과 재배치
         final_results = [None] * len(images)
-        for (lora_name, group, _), results in zip(group_tasks, group_results):
+        for (model_name, group, _), results in zip(group_tasks, group_results):
             for result, original_idx in zip(results, group["indices"]):
                 final_results[original_idx] = result
         return final_results
@@ -228,13 +201,13 @@ class GroupedLLM:
         self,
         images,
         user_prompts,
-        lora_names: List = None,
+        model_names: List = None,
     ):
         return asyncio.run(
             self._infer_async_batch(
                 images,
                 user_prompts,
-                lora_names,
+                model_names,
             ),
         )
 
@@ -244,8 +217,11 @@ class MonkeyOCR:
         self,
         config_path,
     ):
+        # config_path = "/home/eric/workspace/MonkeyOCR/model_configs.yaml"
         with open(config_path, "r", encoding="utf-8") as f:
             self.configs = yaml.load(f, Loader=yaml.FullLoader)
+            # configs = yaml.load(f, Loader=yaml.FullLoader)
+        # configs["models"]["llm"]
         logger.info("using configs: {}".format(self.configs))
 
         self.device = self.configs.get("device", "cpu")
@@ -282,11 +258,8 @@ class MonkeyOCR:
         ### Relation model:
 
         ### LLM:
-        self.llm_config = self.models_config.get("llm")
         self.llm = GroupedLLM(
-            url=self.llm_config.get("url"),
-            model_name=self.llm_config.get("name"),
-            loras=self.llm_config.get("loras", {}),
+            models=self.models_config.get("llm"),
         )
-        logger.info(f"LLM loaded: {self.llm.model_name}")
+        # logger.info(f"LLM loaded: {self.llm.model_name}")
         ### : LLM

@@ -1,17 +1,12 @@
-class LoRAType:
-    BASE = "base"
+class ModelNames:
+    TEXT = "Qwen2.5-VL-7B-Instruct"
+    FORMULA = "Qwen2.5-VL-7B-Instruct"
+    IMAGE = "Qwen2.5-VL-7B-Instruct"
     TABLE = "table_image_otsl"
 
 
-class BasePrompts:
+class Prompts:
     TEXT = "Please output the text content from the image."
     FORMULA = "Please write out the expression of the formula in the image using LaTeX format."
-    TABLE = "This is the image of a table. Please output the table in html format."
-    Image = "Write a caption describing the image."
-
-
-class LoRAPrompts:
-    BASE = "Please output the content from the image. Output only the extracted content, no additional text."
+    IMAGE = "Write a caption describing the image."
     TABLE = "Parse the table in the image."
-    TEXT = "Please output the text content from the image. Output only the text content, no additional text."
-    Image = "Write a caption describing the image."

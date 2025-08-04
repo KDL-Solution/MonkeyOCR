@@ -7,7 +7,16 @@ models:
     name: layoutlm_v3
     weight: /home/eric/workspace/MonkeyOCR/model_weight/Relation
   llm:
-    name: Qwen2.5-VL-7B-Instruct
-    loras:
-      table_image_otsl: table_image_otsl  
-    url: http://192.168.20.58:9800/v1
+    - name: Qwen2.5-VL-7B-Instruct
+      url: http://192.168.20.58:9800/v1
+    - name: table_image_otsl
+      url: http://192.168.20.58:9800/v1
+    # name: Qwen2.5-VL-7B-Instruct
+    # loras:
+    #   table_image_otsl: table_image_otsl
+    #   a: b
+    # url: http://192.168.20.58:9800/v1
+    # url: http://192.168.20.58:9800/v1
+    # models:
+    #   base: Qwen2.5-VL-7B-Instruct
+    #   table_image_otsl: table_image_otsl
