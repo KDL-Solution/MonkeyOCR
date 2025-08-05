@@ -58,7 +58,7 @@ class ModelNames:
 
 
 class Prompts:
-    TEXT = "Please output the text content from the image."
+    TEXT = "Please output the text content from the image. do not output any other content."
     FORMULA = "Please write out the expression of the formula in the image using LaTeX format."
     IMAGE = "Write a caption describing the image."
     TABLE = "Parse the table in the image."
