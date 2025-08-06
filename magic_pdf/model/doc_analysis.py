@@ -10,7 +10,7 @@ from PIL import Image
 
 from magic_pdf.data.dataset import Dataset
 from magic_pdf.libs.clean_memory import clean_memory
-from magic_pdf.operators.result import InferenceResult
+from magic_pdf.operators.pipe_result import InferenceResult
 from magic_pdf.config.ocr_content_type import CategoryId
 from magic_pdf.config.prompts import PromptConfig
 from magic_pdf.model.sub_modules.model_utils import (

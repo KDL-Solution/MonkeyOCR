@@ -3,10 +3,8 @@ import json
 import os
 from typing import List
 
-from magic_pdf.config.constants import PARSE_TYPE_OCR
 from magic_pdf.data.data_reader_writer import DataWriter
 from magic_pdf.data.dataset import Dataset
-from magic_pdf.libs.version import __version__
 from magic_pdf.pdf_parsing import pdf_parse_union
 from magic_pdf.model.monkeyocr import MonkeyOCR
 from magic_pdf.config.make_content_config import DropMode, MakeMode

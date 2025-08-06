@@ -1,10 +1,10 @@
 import copy
-
 from loguru import logger
 
-from magic_pdf.config.constants import CROSS_PAGE, LINES_DELETED
 from magic_pdf.config.ocr_content_type import BlockType, ContentType
 from magic_pdf.libs.language import detect_lang
+
+LINES_DELETED = 'lines_deleted'  # Whether lines in block are deleted
 
 LINE_STOP_FLAG = (
     '.',
@@ -292,11 +292,10 @@ def __merge_2_text_blocks(block1, block2):
                             if block1['page_num'] != block2['page_num']:
                                 for line in block1['lines']:
                                     for span in line['spans']:
-                                        span[CROSS_PAGE] = True
+                                        span["cross_page"] = True
                             block2['lines'].extend(block1['lines'])
                             block1['lines'] = []
                             block1[LINES_DELETED] = True
-
     return block1, block2
 
 
@@ -304,7 +303,7 @@ def __merge_2_list_blocks(block1, block2):
     if block1['page_num'] != block2['page_num']:
         for line in block1['lines']:
             for span in line['spans']:
-                span[CROSS_PAGE] = True
+                span["cross_page"] = True
     block2['lines'].extend(block1['lines'])
     block1['lines'] = []
     block1[LINES_DELETED] = True
@@ -313,12 +312,11 @@ def __merge_2_list_blocks(block1, block2):
 
 
 def __is_list_group(text_blocks_group):
-
-
     for block in text_blocks_group:
         if len(block['lines']) > 3:
             return False
     return True
+
 
 def __is_list_group_llm(text_blocks_group):
     for block in text_blocks_group:
@@ -363,7 +361,6 @@ def __para_merge_page(blocks):
                         and prev_block['type'] == BlockType.Index
                     ):
                         __merge_2_list_blocks(current_block, prev_block)
-
         else:
             continue
 
