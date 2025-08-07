@@ -67,7 +67,7 @@ def _recursive_xy_cut(
     boxes: np.ndarray,
     indices: List[int],
     res: List[int],
-):
+) -> None:
     assert len(boxes) == len(indices)
 
     _indices = boxes[:, 1].argsort()

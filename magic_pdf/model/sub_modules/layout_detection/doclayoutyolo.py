@@ -1,4 +1,5 @@
 import time
+import torch.nn as nn
 import numpy as np
 from PIL import Image
 from typing import List, Dict, Any
@@ -6,7 +7,7 @@ from loguru import logger
 from doclayout_yolo import YOLOv10
 
 from magic_pdf.data.dataset import BaseDataset
-from magic_pdf.model.sub_modules.model_utils import crop_img
+from magic_pdf.model.sub_modules.model_utils import crop
 
 
 class DocLayoutYOLO(object):
@@ -63,7 +64,7 @@ def layout_det_pre(
 
 def run_layout_det(
     images: List[np.ndarray],
-    model,
+    model: nn.Module,
     batch_size: int = 1
 ) -> List[List[Dict[str, Any]]]:
     layout_start_time = time.time()
@@ -94,7 +95,7 @@ def layout_det_post(
         _new_images = []
         _cat_ids = []
         for layout_el in _layout_det_out:
-            new_image, _ = crop_img(
+            new_image, _ = crop(
                 layout_el,
                 image,
                 crop_paste_x=50,

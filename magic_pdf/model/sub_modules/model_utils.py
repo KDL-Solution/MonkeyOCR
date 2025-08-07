@@ -6,7 +6,7 @@ from loguru import logger
 from magic_pdf.libs.clean_memory import clean_memory
 
 
-def crop_img(
+def crop(
     input_res,
     input_pil_img,
     crop_paste_x=0,

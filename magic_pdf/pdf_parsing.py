@@ -118,7 +118,11 @@ def _calculate_block_index(fix_blocks, sorted_bboxes):
         random_boxes = np.array(block_bboxes)
         np.random.shuffle(random_boxes)
         res = []
-        _recursive_xy_cut(np.asarray(random_boxes).astype(int), np.arange(len(block_bboxes)), res)
+        _recursive_xy_cut(
+            np.asarray(random_boxes).astype(int),
+            np.arange(len(block_bboxes)),
+            res,
+        )
         assert len(res) == len(block_bboxes)
         sorted_boxes = random_boxes[np.array(res)].tolist()
 
@@ -192,9 +196,12 @@ def _sort(
 
     for block in fix_blocks:
         if block["type"] in [
-            BlockType.Text, BlockType.Title,
-            BlockType.ImageCaption, BlockType.ImageFootnote,
-            BlockType.TableCaption, BlockType.TableFootnote
+            BlockType.Text,
+            BlockType.Title,
+            BlockType.ImageCaption,
+            BlockType.ImageFootnote,
+            BlockType.TableCaption,
+            BlockType.TableFootnote,
         ]:
             if len(block["lines"]) == 0:
                 add_lines_to_block(block)
@@ -205,7 +212,11 @@ def _sort(
                 for line in block["lines"]:
                     bbox = line["bbox"]
                     page_line_list.append(bbox)
-        elif block["type"] in [BlockType.ImageBody, BlockType.TableBody, BlockType.InterlineEquation]:
+        elif block["type"] in [
+            BlockType.ImageBody,
+            BlockType.TableBody,
+            BlockType.InterlineEquation,
+        ]:
             block["real_lines"] = copy.deepcopy(block["lines"])
             add_lines_to_block(block)
 
@@ -455,140 +466,6 @@ def _merge_title_blocks(
         blocks.remove(b)
 
 
-def _postprocess(
-    fitz_page: FitzPage,
-    magic_model: MagicModel,
-    page_id: int,
-    md5: str,
-    image_writer: DataWriter,
-    rel_pred: nn.Module,
-    need_drop = False,  # Fixed.
-    drop_reason = [],  # Fixed.
-):
-    image_groups = magic_model.get_images(page_id)
-    table_groups = magic_model.get_tables(page_id)
-    img_body_blocks, img_caption_blocks, img_footnote_blocks = _process_groups(
-        image_groups,
-        "image_body",
-        "image_caption_list",
-        "image_footnote_list",
-    )
-    table_body_blocks, table_caption_blocks, table_footnote_blocks = _process_groups(
-        table_groups,
-        "table_body",
-        "table_caption_list",
-        "table_footnote_list",
-    )
-
-    discarded_blocks = magic_model.get_discarded(page_id)
-    text_blocks = magic_model.get_text_blocks(page_id)
-    title_blocks = magic_model.get_title_blocks(page_id)
-    _, interline_equations, interline_equation_blocks = magic_model.get_equations(page_id)
-    page_w, page_h = magic_model.get_page_size(page_id)
-
-    all_bboxes, all_discarded_blocks = _prepare_bboxes_for_layout_split(
-        img_body_blocks,
-        img_caption_blocks,
-        img_footnote_blocks,
-        table_body_blocks,
-        table_caption_blocks,
-        table_footnote_blocks,
-        discarded_blocks,
-        text_blocks,
-        title_blocks,
-        interline_equation_blocks,
-        page_w,
-        page_h,
-    )
-
-    spans = magic_model.get_all_spans(page_id)
-    spans = _remove_outside_spans(
-        spans,
-        all_bboxes,
-        all_discarded_blocks,
-    )
-    spans, _ = _remove_overlaps_low_confidence_spans(spans)
-    spans, _ = _remove_overlaps_min_spans(spans)
-    discarded_block_with_spans, spans = _fill_spans_in_blocks(
-        blocks=all_discarded_blocks,
-        spans=spans,
-        ratio=0.4
-    )
-    fix_discarded_blocks = fix_discarded_block(discarded_block_with_spans)
-
-    if len(all_bboxes) == 0:
-        logger.warning(f"skip this page, not found useful bbox, page_id: {page_id}")
-        return 
-    (
-            [],
-            [],
-            page_id,
-            page_w,
-            page_h,
-            [],
-            [],
-            [],
-            interline_equations,
-            fix_discarded_blocks,
-            need_drop,
-            drop_reason,
-        )
-
-    spans = _cut_image_and_table(
-        spans,
-        fitz_page,
-        page_id,
-        md5,
-        image_writer,
-    )
-    block_with_spans, spans = _fill_spans_in_blocks(
-        blocks=all_bboxes,
-        spans=spans,
-        ratio=0.5,
-    )
-    fix_blocks = _fix_block_spans(block_with_spans)
-
-    _merge_title_blocks(
-        fix_blocks,
-        x_distance_thresh=0.1 * page_w,
-    )
-    line_height = _get_line_height(fix_blocks)
-    _sorted_bboxes = _sort(
-        fix_blocks=fix_blocks,
-        page_w=page_w,
-        page_h=page_h,
-        line_height=line_height,
-        rel_pred=rel_pred,
-    )
-    fix_blocks = _calculate_block_index(
-        fix_blocks=fix_blocks,
-        sorted_bboxes=_sorted_bboxes,
-    )
-    fix_blocks = _revert_group_blocks(fix_blocks)
-    sorted_blocks = sorted(fix_blocks, key=lambda b: b["index"])
-
-    for block in sorted_blocks:
-        if block["type"] in [BlockType.Image, BlockType.Table]:
-            block["blocks"] = sorted(block["blocks"], key=lambda b: b["index"])
-
-    images, tables, interline_equations = _get_qa_need_list(sorted_blocks)
-    page_info = _construct_page_component(
-        sorted_blocks,
-        [],
-        page_id,
-        page_w,
-        page_h,
-        [],
-        images,
-        tables,
-        interline_equations,
-        fix_discarded_blocks,
-        need_drop,
-        drop_reason,
-    )
-    return page_info
-
-
 def _para_split(pdf_info_dict):
     all_blocks = []
     for page_num, page in pdf_info_dict.items():
@@ -611,6 +488,8 @@ def postprocess(
     image_writer: DataWriter,
     monkeyocr: MonkeyOCR,
     debug_mode=False,
+    need_drop = False,  # Fixed.
+    drop_reason = [],  # Fixed.
 ):
     md5 = _compute_md5(dataset.data_bits())
 
@@ -622,7 +501,7 @@ def postprocess(
     start_time = time.time()
 
     pdf_info_dict = {}
-    for page_id, page in enumerate(dataset):
+    for page_id, fitz_page in enumerate(dataset):
         if debug_mode:
             time_now = time.time()
             logger.info(
@@ -630,13 +509,126 @@ def postprocess(
             )
             start_time = time_now
 
-        page_info = _postprocess(
-            fitz_page=page,
-            magic_model=magic_model,
-            page_id=page_id,
-            md5=md5,
-            image_writer=image_writer,
+        image_groups = magic_model.get_images(page_id)
+        table_groups = magic_model.get_tables(page_id)
+        img_body_blocks, img_caption_blocks, img_footnote_blocks = _process_groups(
+            image_groups,
+            "image_body",
+            "image_caption_list",
+            "image_footnote_list",
+        )
+        table_body_blocks, table_caption_blocks, table_footnote_blocks = _process_groups(
+            table_groups,
+            "table_body",
+            "table_caption_list",
+            "table_footnote_list",
+        )
+
+        discarded_blocks = magic_model.get_discarded(page_id)
+        text_blocks = magic_model.get_text_blocks(page_id)
+        title_blocks = magic_model.get_title_blocks(page_id)
+        _, interline_equations, interline_equation_blocks = magic_model.get_equations(page_id)
+        page_w, page_h = magic_model.get_page_size(page_id)
+
+        all_bboxes, all_discarded_blocks = _prepare_bboxes_for_layout_split(
+            img_body_blocks,
+            img_caption_blocks,
+            img_footnote_blocks,
+            table_body_blocks,
+            table_caption_blocks,
+            table_footnote_blocks,
+            discarded_blocks,
+            text_blocks,
+            title_blocks,
+            interline_equation_blocks,
+            page_w,
+            page_h,
+        )
+
+        spans = magic_model.get_all_spans(page_id)
+        spans = _remove_outside_spans(
+            spans,
+            all_bboxes,
+            all_discarded_blocks,
+        )
+        spans, _ = _remove_overlaps_low_confidence_spans(spans)
+        spans, _ = _remove_overlaps_min_spans(spans)
+        discarded_block_with_spans, spans = _fill_spans_in_blocks(
+            blocks=all_discarded_blocks,
+            spans=spans,
+            ratio=0.4
+        )
+        fix_discarded_blocks = fix_discarded_block(discarded_block_with_spans)
+
+        if len(all_bboxes) == 0:
+            logger.warning(f"skip this page, not found useful bbox, page_id: {page_id}")
+            return 
+        (
+                [],
+                [],
+                page_id,
+                page_w,
+                page_h,
+                [],
+                [],
+                [],
+                interline_equations,
+                fix_discarded_blocks,
+                need_drop,
+                drop_reason,
+            )
+
+        spans = _cut_image_and_table(
+            spans,
+            fitz_page,
+            page_id,
+            md5,
+            image_writer,
+        )
+        block_with_spans, spans = _fill_spans_in_blocks(
+            blocks=all_bboxes,
+            spans=spans,
+            ratio=0.5,
+        )
+        fix_blocks = _fix_block_spans(block_with_spans)
+
+        _merge_title_blocks(
+            fix_blocks,
+            x_distance_thresh=0.1 * page_w,
+        )
+        line_height = _get_line_height(fix_blocks)
+        _sorted_bboxes = _sort(
+            fix_blocks=fix_blocks,
+            page_w=page_w,
+            page_h=page_h,
+            line_height=line_height,
             rel_pred=monkeyocr.rel_pred,
+        )
+        fix_blocks = _calculate_block_index(
+            fix_blocks=fix_blocks,
+            sorted_bboxes=_sorted_bboxes,
+        )
+        fix_blocks = _revert_group_blocks(fix_blocks)
+        sorted_blocks = sorted(fix_blocks, key=lambda b: b["index"])
+
+        for block in sorted_blocks:
+            if block["type"] in [BlockType.Image, BlockType.Table]:
+                block["blocks"] = sorted(block["blocks"], key=lambda b: b["index"])
+
+        images, tables, interline_equations = _get_qa_need_list(sorted_blocks)
+        page_info = _construct_page_component(
+            sorted_blocks,
+            [],
+            page_id,
+            page_w,
+            page_h,
+            [],
+            images,
+            tables,
+            interline_equations,
+            fix_discarded_blocks,
+            need_drop,
+            drop_reason,
         )
         pdf_info_dict[f"page_{page_id}"] = page_info
 
