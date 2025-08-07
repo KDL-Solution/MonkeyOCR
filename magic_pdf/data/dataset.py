@@ -176,7 +176,11 @@ class BaseDataset(ABC):
 
 
 class PDFDataset(BaseDataset):
-    def __init__(self, bits: bytes, lang=None):
+    def __init__(
+        self,
+        bits: bytes,
+        lang: str = None,
+    ):
         """Initialize the dataset, which wraps the pymudoc documents.
 
         Args:
@@ -191,7 +195,7 @@ class PDFDataset(BaseDataset):
             self._lang = None
         else:
             self._lang = lang
-            logger.info(f"lang: {lang}")
+            logger.info(f"Lang: {lang}")
 
     def __len__(self) -> int:
         """The page number of the pdf."""

@@ -12,18 +12,19 @@ if not os.getenv("FTLANG_CACHE"):
 from fast_langdetect import detect_language
 
 
-def remove_invalid_surrogates(text):
+def _remove_invalid_surrogates(text):
     return ''.join(c for c in text if not (0xD800 <= ord(c) <= 0xDFFF))
 
 
-def detect_lang(text: str) -> str:
+def detect_lang(
+    text: str,
+) -> str:
     if len(text) == 0:
         return ""
 
     text = text.replace("\n", "")
-    text = remove_invalid_surrogates(text)
+    text = _remove_invalid_surrogates(text)
 
-    # print(text)
     try:
         lang_upper = detect_language(text)
     except:

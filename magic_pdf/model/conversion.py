@@ -1,18 +1,15 @@
 import time
 import copy
-import numpy as np
 from loguru import logger
-from PIL import Image
 from typing import List, Dict, Any
-from PIL import Image
 
 from magic_pdf.data.dataset import BaseDataset
 from magic_pdf.data.data_reader_writer import DataWriter
 from magic_pdf.libs.clean_memory import clean_memory
-from magic_pdf.operators.conversion_result import IntermediateConversionResult
+from magic_pdf.conversion_result import IntermediateConversionResult
 from magic_pdf.config.ocr_content_type import CategoryId
 from magic_pdf.config.prompts import PromptConfig
-from magic_pdf.model.sub_modules.model_utils import clean_vram
+from magic_pdf.model.vram import clean_vram
 from magic_pdf.model.monkeyocr import MonkeyOCR
 from magic_pdf.model.sub_modules.layout_detection.doclayoutyolo import (
     layout_det_pre,
@@ -26,7 +23,7 @@ def run_llm(
     cat_ids,
     model,
 ) -> List[str]:
-    logger.info("LLM inference start...")
+    # logger.info("LLM inference start...")
 
     assert len(images) == len(cat_ids)
 
@@ -75,10 +72,11 @@ def run_llm(
 
 
 def llm_post(
+    dataset: BaseDataset,
     layout_det_out,
     llm_out,
     page_indices,
-):
+) -> List[Dict[str, Any]]:
     """layout detection 출력에 LLM 출력을 추가
     """
     for page_idx in range(len(page_indices)):
@@ -115,11 +113,26 @@ def llm_post(
                 layout_el["score"] = 1.
                 layout_el["html"] = _llm_out
         _layout_det_out.extend(ocr_results)
-        logger.info(f"LLM processed images: {page_idx + 1} / {len(page_indices)}")
+        # logger.info(f"LLM processed images: {page_idx + 1} / {len(page_indices)}")
     # logger.info(
     #     f"llm ocr time: {round(time.time() - llm_start, 2)}, image num: {len(page_indices)}"
     # )
-    return layout_det_out
+    # return layout_det_out
+    final_out = []
+    for index in range(len(dataset)):  # Same as # pages.
+        page_data = dataset.get_page(index)
+        img_dict = page_data.get_image()
+        final_out.append(
+            {
+                "layout_dets": layout_det_out.pop(0),
+                "page_info": {
+                    "page_no": index,
+                    "height": img_dict["height"],  # page height
+                    "width": img_dict["width"],  # page width
+                },
+            }
+        )
+    return final_out
 
 
 def convert(
@@ -127,12 +140,12 @@ def convert(
     image_writer: DataWriter,
     monkeyocr: MonkeyOCR,
 ) -> IntermediateConversionResult:
-    conv_start = time.time()
-
     ### Layout detection:
+    layout_det_start = time.time()
+
     images = layout_det_pre(
         dataset,
-    )
+    )  # Same as # pages.
     layout_det_out = run_layout_det(
         images,
         model=monkeyocr.layout_det,
@@ -145,53 +158,60 @@ def convert(
         images,
         layout_det_out,
     )
+
+    layout_det_time = time.time() - layout_det_start
+    layout_det_speed = layout_det_time / len(dataset)
+    logger.info(
+        f"Layout detection: {round(layout_det_time, 2)}s"
+        f" ({round(layout_det_speed, 2)}s/pages)"
+    )
     ### : Layout detection
 
     ### LLM:
+    llm_start = time.time()
+
     llm_out = run_llm(
         layout_det_post_out["images"],
         cat_ids=layout_det_post_out["category_ids"],
         model=monkeyocr.llm,
     )  # LLM inference.
     llm_post_out = llm_post(
+        dataset=dataset,
         layout_det_out=layout_det_out,
         llm_out=llm_out,
         page_indices=layout_det_post_out["page_indices"],
     )
-    ### : LLM
 
-    model_json = []
-    for index in range(len(dataset)):
-        page_data = dataset.get_page(index)
-        img_dict = page_data.get_image()
-        model_json.append(
-            {
-                "layout_dets": llm_post_out.pop(0),
-                "page_info": {
-                    "page_no": index,
-                    "height": img_dict["height"],  # page height
-                    "width": img_dict["width"],  # page width
-                },
-            }
-        )
+    llm_time = time.time() - llm_start
+    llm_speed = llm_time / len(dataset)
+    logger.info(
+        f"LLM: {round(llm_time, 2)}s"
+        f" ({round(llm_speed, 2)}s/pages)"
+    )
+    ### : LLM
 
     gc_start = time.time()
     clean_memory(monkeyocr.device)
-    gc_time = round(time.time() - gc_start, 2)
-    logger.info(f"gc time: {gc_time}")
+    gc_time = time.time() - gc_start
+    logger.info(f"Garbage collection time: {round(gc_time, 2)}")
 
-    conv_time = round(time.time() - conv_start, 2)
-    conv_speed = round(len(dataset) / conv_time, 2)
-    logger.info(
-        f"document conversion time: {round(time.time() - conv_start, 2)},"
-        f"speed: {conv_speed} pages/second"
-    )
     ### Relation prediction:
-    return IntermediateConversionResult(
-        model_json,
-        dataset,
+    rel_pred_start = time.time()
+
+    final_out = IntermediateConversionResult(
+        # conv_results=model_json,
+        conv_results=llm_post_out,
+        dataset=dataset,
     ).make_conversion_result(
         image_writer=image_writer,
         monkeyocr=monkeyocr,
     )
+
+    rel_pred_time = time.time() - rel_pred_start
+    rel_pred_speed = rel_pred_time / len(dataset)
+    logger.info(
+        f"Relation prediction: {round(rel_pred_time, 2)}s"
+        f" ({round(rel_pred_speed, 2)}s/pages)"
+    )
     ### : Relation prediction
+    return final_out

@@ -3,14 +3,73 @@ import yaml
 import io
 import base64
 import asyncio
+import os
+import requests
+import logging
 from loguru import logger
-from typing import List, Dict
+from typing import Union, List, Dict
 from openai import OpenAI, AsyncOpenAI
 from collections import defaultdict
 from transformers import LayoutLMv3ForTokenClassification
+from io import BytesIO
+from PIL import Image, ImageFile
 
-from magic_pdf.utils.load_image import load_image
 from magic_pdf.model.sub_modules.layout_detection.doclayoutyolo import DocLayoutYOLO
+
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
+
+def _load_image_from_base64(
+    image: Union[bytes, str],
+) -> Image.Image:
+    """load image from base64 format."""
+    return Image.open(BytesIO(base64.b64decode(image)))
+
+
+def load_image(
+    image_url: Union[str, Image.Image],
+    max_size = None,
+) -> Image.Image:
+    """load image from url, local path or openai GPT4V."""
+    FETCH_TIMEOUT = int(os.environ.get("LMDEPLOY_FETCH_TIMEOUT", 10))
+    headers = {
+        "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+    }
+    try:
+        ImageFile.LOAD_TRUNCATED_IMAGES = True
+        if isinstance(image_url, Image.Image):
+            img = image_url
+        elif image_url.startswith("http"):
+            response = requests.get(
+                image_url,
+                headers=headers,
+                timeout=FETCH_TIMEOUT,
+            )
+            response.raise_for_status()
+            img = Image.open(BytesIO(response.content))
+        elif image_url.startswith("data:image"):
+            img = _load_image_from_base64(image_url.split(",")[1])
+        else:
+            # Load image from local path
+            img = Image.open(image_url)
+
+        # check image valid
+        img = img.convert("RGB")
+
+        # resize image if too large
+        if max_size and max(img.size) > max_size:
+            scale = max_size / max(img.size)
+            new_size = (int(img.size[0] * scale), int(img.size[1] * scale))
+            img = img.resize(new_size, Image.LANCZOS)
+    except Exception as error:
+        if isinstance(image_url, str) and len(image_url) > 100:
+            image_url = image_url[:100] + " ..."
+        logger.error(f"{error}, image_url={image_url}")
+        # use dummy image
+        img = Image.new("RGB", (32, 32))
+    return img
 
 
 class LLM:
@@ -97,7 +156,7 @@ class LLM:
         images,
         user_prompts,
     ):
-        logger.info(f"{self.model} - Processing batch inference with {len(images)} images and user prompts.")
+        # logger.info(f"{self.model} - Processing batch inference with {len(images)} images and user prompts.")
         if len(images) != len(user_prompts):
             raise ValueError("Images and user prompts must have the same length")
         
@@ -217,11 +276,8 @@ class MonkeyOCR:
         self,
         config_path,
     ):
-        # config_path = "/home/eric/workspace/MonkeyOCR/model_configs.yaml"
         with open(config_path, "r", encoding="utf-8") as f:
             self.configs = yaml.load(f, Loader=yaml.FullLoader)
-            # configs = yaml.load(f, Loader=yaml.FullLoader)
-        # configs["models"]["llm"]
         logger.info("using configs: {}".format(self.configs))
 
         self.device = self.configs.get("device", "cpu")
@@ -241,10 +297,10 @@ class MonkeyOCR:
             weight=self.layout_det_config.get("weight"),
             device=self.device,
         )
-        logger.info(f'Layout detection model loaded: {self.layout_det_config.get("name")}')
+        logger.info(f"Layout detection model loaded: {self.layout_det_config.get('name')}")
         ### : Layout detection model
 
-        ### Relation model:
+        ### Relation prediction model:
         self.relation_config = self.models_config.get("relation")
         _model = LayoutLMv3ForTokenClassification.from_pretrained(
             self.relation_config.get("weight"),
@@ -254,8 +310,8 @@ class MonkeyOCR:
         else:
             _model.to(self.device).eval()
         self.rel_pred = _model
-        logger.info(f'Relation model loaded: {self.relation_config.get("name")}')
-        ### Relation model:
+        logger.info(f"Relation prediction model loaded: {self.relation_config.get('name')}")
+        ### Relation prediction model:
 
         ### LLM:
         self.llm = GroupedLLM(

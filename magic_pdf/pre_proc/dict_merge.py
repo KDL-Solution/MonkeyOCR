@@ -116,7 +116,7 @@ def _fix_block_spans(block_with_spans):
     return fix_blocks
 
 
-def fix_discarded_block(discarded_block_with_spans):
+def _fix_discarded_block(discarded_block_with_spans):
     fix_discarded_blocks = []
     for block in discarded_block_with_spans:
         block = fix_text_block(block)

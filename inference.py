@@ -17,7 +17,6 @@ from magic_pdf.data.data_reader_writer import FileBasedDataWriter, FileBasedData
 from magic_pdf.data.dataset import PDFDataset, ImageDataset
 from magic_pdf.model.conversion import convert
 from magic_pdf.model.monkeyocr import MonkeyOCR
-# from magic_pdf.operators.result import InferenceResult
 
 
 def to_pdf_bytes(
@@ -40,6 +39,7 @@ def parse_folder(
     in_folder: str,
     output_dir: str,
     monkeyocr: MonkeyOCR,
+    debug_mode: bool = False,
 ):
     """
     Parse file and save results
@@ -49,9 +49,6 @@ def parse_folder(
         output_dir: Output directory
         monkeyocr: Pre-initialized model instance
     """
-    # input_file = "/mnt/AI_NAS/Data/경기도청/monkeyocr_test/재해ㆍ재난 위기대응 절차서"
-    # input_file = "/mnt/AI_NAS/Data/경기도청/경기도청_샘플데이터/RAG 구축을 위한 공통 자료/20241028_4. 개인정보처리시스템 재해ㆍ재난 위기대응 절차서/20241028_4. 개인정보처리시스템 재해ㆍ재난 위기대응 절차서_page-0016.jpg"
-    # output_dir = "/home/eric/workspace/MonkeyOCR/output/"
     print(f"Starting to parse file: {in_folder}")
 
     # Check if input file exists
@@ -85,25 +82,26 @@ def parse_folder(
         file_bytes,
     )
 
-    # Start inference
-    print("Performing document parsing...")
-    start_time = time.time()
+    print("Performing document conversion...")
+    conv_start = time.time()
 
     conv_result = convert(
         dataset=dataset,
         image_writer=image_writer,
         monkeyocr=monkeyocr,
     )
-    parsing_time = time.time() - start_time
-    print(f"Parsing time: {parsing_time:.2f}s")
+
+    conv_time = time.time() - conv_start
+    print(f"Document conversion time: {conv_time:.2f}s")
 
     # conv_result.draw_model(os.path.join(local_md_dir, f"{name_without_suff}_draw_model.pdf"))
 
     conv_result.dump_markdown(md_writer, f"{name_without_suff}_dump_markdown.md", image_dir)  # 우리가 원하는 것.
-    conv_result.draw_layout(os.path.join(local_md_dir, f"{name_without_suff}_draw_layout.pdf"))
-    conv_result.draw_span(os.path.join(local_md_dir, f"{name_without_suff}_draw_span.pdf"))
-    conv_result.dump_content_list(md_writer, f"{name_without_suff}_dump_content_list.json", image_dir)
-    conv_result.dump_middle_json(md_writer, f'{name_without_suff}_dump_middle.json')
+    if debug_mode:
+        conv_result.draw_layout(os.path.join(local_md_dir, f"{name_without_suff}_draw_layout.pdf"))
+        conv_result.draw_span(os.path.join(local_md_dir, f"{name_without_suff}_draw_span.pdf"))
+        conv_result.dump_content_list(md_writer, f"{name_without_suff}_dump_content_list.json", image_dir)
+        conv_result.dump_middle_json(md_writer, f'{name_without_suff}_dump_middle.json')
 
     print("Results saved to ", local_md_dir)
     return local_md_dir

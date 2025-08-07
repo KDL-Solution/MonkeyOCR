@@ -10,20 +10,20 @@ from typing import List, Dict, Any, Tuple
 from loguru import logger
 
 from magic_pdf.config.ocr_content_type import BlockType, ContentType
-from magic_pdf.data.dataset import BaseDataset, FitzPage
+from magic_pdf.data.dataset import BaseDataset
 from magic_pdf.data.data_reader_writer import DataWriter
 from magic_pdf.libs.bbox import (
     calculate_overlap_area_in_bbox1_area_ratio,
     __is_overlaps_y_exceeds_threshold,
 )
-from magic_pdf.libs.clean_memory import clean_memory
 from magic_pdf.model.magic_model import MagicModel
-from magic_pdf.pre_proc.cut_image import _cut_image_and_table
+from magic_pdf.libs.clean_memory import clean_memory
+from magic_pdf.pre_proc.cut import _cut_image_and_table
 from magic_pdf.pre_proc.bboxes_detection import _prepare_bboxes_for_layout_split
 from magic_pdf.pre_proc.dict_merge import (
     _fill_spans_in_blocks,
     _fix_block_spans,
-    fix_discarded_block,
+    _fix_discarded_block,
 )
 from magic_pdf.pre_proc.span_list_modification import (
     _get_qa_need_list,
@@ -83,7 +83,6 @@ def _construct_page_component(
 
 def _calculate_block_index(fix_blocks, sorted_bboxes):
     if sorted_bboxes is not None:
-
         for block in fix_blocks:
             line_index_list = []
             if len(block["lines"]) == 0:
@@ -96,19 +95,21 @@ def _calculate_block_index(fix_blocks, sorted_bboxes):
                 block["index"] = median_value
 
 
-            if block["type"] in [BlockType.ImageBody, BlockType.TableBody, BlockType.Title, BlockType.InterlineEquation]:
+            if block["type"] in [
+                BlockType.ImageBody,
+                BlockType.TableBody,
+                BlockType.Title,
+                BlockType.InterlineEquation,
+            ]:
                 if "real_lines" in block:
                     block["virtual_lines"] = copy.deepcopy(block["lines"])
                     block["lines"] = copy.deepcopy(block["real_lines"])
                     del block["real_lines"]
     else:
-
         block_bboxes = []
         for block in fix_blocks:
-
             block["bbox"] = [max(0, x) for x in block["bbox"]]
             block_bboxes.append(block["bbox"])
-
 
             if block["type"] in [BlockType.ImageBody, BlockType.TableBody]:
                 block["virtual_lines"] = copy.deepcopy(block["lines"])
@@ -140,7 +141,12 @@ def _calculate_block_index(fix_blocks, sorted_bboxes):
     return fix_blocks
 
 
-def _insert_lines_into_block(block_bbox, line_height, page_w, page_h):
+def _insert_lines_into_block(
+    block_bbox,
+    line_height,
+    page_w: int,
+    page_h: int,
+):
     x0, y0, x1, y1 = block_bbox
 
     block_height = y1 - y0
@@ -152,7 +158,6 @@ def _insert_lines_into_block(block_bbox, line_height, page_w, page_h):
         ):
             lines = int(block_height / line_height) + 1
         else:
-
             if block_weight > page_w * 0.4:
                 lines = 3
                 line_height = (y1 - y0) / lines
@@ -166,11 +171,16 @@ def _insert_lines_into_block(block_bbox, line_height, page_w, page_h):
                     line_height = (y1 - y0) / lines
 
         current_y = y0
-
         lines_positions = []
-
         for _ in range(lines):
-            lines_positions.append([x0, current_y, x1, current_y + line_height])
+            lines_positions.append(
+                [
+                    x0,
+                    current_y,
+                    x1,
+                    current_y + line_height,
+                ]
+            )
             current_y += line_height
         return lines_positions
 
@@ -494,8 +504,8 @@ def postprocess(
     md5 = _compute_md5(dataset.data_bits())
 
     magic_model = MagicModel(
-        model_list,
-        dataset,
+        model_list=model_list,
+        dataset=dataset,
     )
 
     start_time = time.time()
@@ -558,7 +568,7 @@ def postprocess(
             spans=spans,
             ratio=0.4
         )
-        fix_discarded_blocks = fix_discarded_block(discarded_block_with_spans)
+        fix_discarded_blocks = _fix_discarded_block(discarded_block_with_spans)
 
         if len(all_bboxes) == 0:
             logger.warning(f"skip this page, not found useful bbox, page_id: {page_id}")
@@ -603,7 +613,7 @@ def postprocess(
             page_h=page_h,
             line_height=line_height,
             rel_pred=monkeyocr.rel_pred,
-        )
+        )  # Relation prediction.
         fix_blocks = _calculate_block_index(
             fix_blocks=fix_blocks,
             sorted_bboxes=_sorted_bboxes,

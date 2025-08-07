@@ -109,7 +109,9 @@ def _ocr_mk_markdown_with_para_core(
     return page_markdown
 
 
-def _merge_para_with_text(para_block):
+def _merge_para_with_text(
+    para_block,
+):
     block_text = ""
     for line in para_block["lines"]:
         for span in line["spans"]:
@@ -119,12 +121,10 @@ def _merge_para_with_text(para_block):
 
     para_text = ""
     for i, line in enumerate(para_block["lines"]):
-
         if i >= 1 and line.get(ListLineTag.IS_LIST_START_LINE, False):
             para_text += "  \n"
 
         for j, span in enumerate(line["spans"]):
-
             span_type = span["type"]
             content = ""
             if span_type == ContentType.Text:
@@ -137,15 +137,21 @@ def _merge_para_with_text(para_block):
             content = content.strip()
 
             if content:
-                langs = ["zh", "ja", "ko"]
                 # logger.info(f"block_lang: {block_lang}, content: {content}")
-                if block_lang in langs: # In Chinese/Japanese/Korean context, line breaks don"t need space separation, but if it"s inline equation ending, still need to add space
+                if block_lang in [
+                    "zh",
+                    "ja",
+                    "ko",
+                ]: # In Chinese/Japanese/Korean context, line breaks don"t need space separation, but if it"s inline equation ending, still need to add space
                     if j == len(line["spans"]) - 1 and span_type not in [ContentType.InlineEquation]:
                         para_text += content
                     else:
                         para_text += f"{content} "
                 else:
-                    if span_type in [ContentType.Text, ContentType.InlineEquation]:
+                    if span_type in [
+                        ContentType.Text,
+                        ContentType.InlineEquation,
+                    ]:
                         # If span is last in line and ends with hyphen, no space should be added at end, and hyphen should be removed
                         if j == len(line["spans"])-1 and span_type == ContentType.Text and __is_hyphen_at_line_end(content):
                             para_text += content[:-1]
@@ -156,7 +162,6 @@ def _merge_para_with_text(para_block):
             else:
                 continue
     # Split connected characters
-    # para_text = __replace_ligatures(para_text)
     return para_text
 
 
