@@ -253,7 +253,7 @@ class MonkeyOCR:
             _model.to(self.device).eval().bfloat16()
         else:
             _model.to(self.device).eval()
-        self.relation = _model
+        self.rel_pred = _model
         logger.info(f'Relation model loaded: {self.relation_config.get("name")}')
         ### Relation model:
 

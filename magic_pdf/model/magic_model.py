@@ -3,7 +3,7 @@ from typing import List
 
 from magic_pdf.config.model_block_type import ModelBlockTypeEnum
 from magic_pdf.config.ocr_content_type import CategoryId, ContentType
-from magic_pdf.data.dataset import Dataset
+from magic_pdf.data.dataset import BaseDataset
 from magic_pdf.libs.boxbase import (
     _is_in,
     bbox_distance,
@@ -80,7 +80,7 @@ class MagicModel:
     def __init__(
         self,
         model_list: List,
-        dataset: Dataset,
+        dataset: BaseDataset,
     ):
         self.__model_list = model_list
         self.__docs = dataset
@@ -89,7 +89,9 @@ class MagicModel:
         self.__fix_by_remove_high_iou_and_low_confidence()
         self.__fix_footnote()
 
-    def __fix_axis(self):
+    def __fix_axis(
+        self,
+    ):
         for model_page_info in self.__model_list:
             need_remove_list = []
             page_no = model_page_info['page_info']['page_no']
@@ -99,12 +101,9 @@ class MagicModel:
             )
             layout_dets = model_page_info['layout_dets']
             for layout_det in layout_dets:
-
                 if layout_det.get('bbox') is not None:
-
                     x0, y0, x1, y1 = layout_det['bbox']
                 else:
-
                     x0, y0, _, _, x1, y1, _, _ = layout_det['poly']
 
                 bbox = [

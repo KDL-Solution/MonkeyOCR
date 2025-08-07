@@ -3,28 +3,28 @@ import statistics
 import time
 import torch
 import hashlib
+import copy
 import numpy as np
 from typing import List
 from loguru import logger
 
 from magic_pdf.config.ocr_content_type import BlockType, ContentType
-from magic_pdf.data.dataset import Dataset, PageableData
+from magic_pdf.data.dataset import BaseDataset, FitzPage
 from magic_pdf.libs.boxbase import (
     calculate_overlap_area_in_bbox1_area_ratio,
     __is_overlaps_y_exceeds_threshold,
 )
 from magic_pdf.libs.clean_memory import clean_memory
 from magic_pdf.model.magic_model import MagicModel
-from magic_pdf.post_proc.para_split_v3 import para_split
-from magic_pdf.pre_proc.cut_image import ocr_cut_image_and_table
-from magic_pdf.pre_proc.ocr_detect_all_bboxes import prepare_bboxes_for_layout_split
+from magic_pdf.pre_proc.cut_image import _cut_image_and_table
+from magic_pdf.pre_proc.ocr_detect_all_bboxes import _prepare_bboxes_for_layout_split
 from magic_pdf.pre_proc.ocr_dict_merge import (
-    fill_spans_in_blocks,
-    fix_block_spans_v2,
+    _fill_spans_in_blocks,
+    _fix_block_spans,
     fix_discarded_block,
 )
 from magic_pdf.pre_proc.ocr_span_list_modify import (
-    get_qa_need_list_v2,
+    _get_qa_need_list,
     remove_overlaps_low_confidence_spans,
     remove_overlaps_min_spans,
 )
@@ -50,7 +50,7 @@ def _dict_to_list(input_dict):
     return items_list
 
 
-def ocr_construct_page_component(
+def _construct_page_component(
     blocks,
     layout_bboxes,
     page_id,
@@ -172,7 +172,7 @@ def _insert_lines_into_block(block_bbox, line_height, page_w, page_h):
         return [[x0, y0, x1, y1]]
 
 
-def predict_reading_order(
+def run_rel_pred(
     boxes: List[List[int]],
     model,
 ) -> List[int]:
@@ -182,12 +182,12 @@ def predict_reading_order(
     return parse_logits(logits, len(boxes))
 
 
-def sort(
+def _sort(
     fix_blocks,
     page_w,
     page_h,
     line_height,
-    model,
+    rel_pred,
 ):
     page_line_list = []
 
@@ -257,15 +257,15 @@ def sort(
         boxes.append([left, top, right, bottom])
 
     with torch.inference_mode():
-        orders = predict_reading_order(
+        orders = run_rel_pred(
             boxes,
-            model=model,
+            model=rel_pred,
         )
     sorted_bboxes = [page_line_list[i] for i in orders]
     return sorted_bboxes
 
 
-def get_line_height(blocks):
+def _get_line_height(blocks):
     page_line_height_list = []
     for block in blocks:
         if block["type"] in [
@@ -282,7 +282,7 @@ def get_line_height(blocks):
         return 10
 
 
-def process_groups(groups, body_key, caption_key, footnote_key):
+def _process_groups(groups, body_key, caption_key, footnote_key):
     body_blocks = []
     caption_blocks = []
     footnote_blocks = []
@@ -298,7 +298,7 @@ def process_groups(groups, body_key, caption_key, footnote_key):
     return body_blocks, caption_blocks, footnote_blocks
 
 
-def process_block_list(blocks, body_type, block_type):
+def _process_block_list(blocks, body_type, block_type):
     indices = [block["index"] for block in blocks]
     median_index = statistics.median(indices)
 
@@ -331,10 +331,10 @@ def _revert_group_blocks(blocks):
             new_blocks.append(block)
 
     for group_id, blocks in image_groups.items():
-        new_blocks.append(process_block_list(blocks, BlockType.ImageBody, BlockType.Image))
+        new_blocks.append(_process_block_list(blocks, BlockType.ImageBody, BlockType.Image))
 
     for group_id, blocks in table_groups.items():
-        new_blocks.append(process_block_list(blocks, BlockType.TableBody, BlockType.Table))
+        new_blocks.append(_process_block_list(blocks, BlockType.TableBody, BlockType.Table))
 
     return new_blocks
 
@@ -381,13 +381,14 @@ def _remove_outside_spans(spans, all_bboxes, all_discarded_blocks):
     return new_spans
 
 
-def parse_page_core(
-    page_doc: PageableData,
+def _parse_page_core(
+    fitz_page: FitzPage,
     magic_model: MagicModel,
     page_id,
     pdf_bytes_md5,
     imageWriter,
-    monkeyocr: MonkeyOCR,
+    # monkeyocr: MonkeyOCR,
+    rel_pred,
 ):
     need_drop = False
     drop_reason = []
@@ -395,40 +396,35 @@ def parse_page_core(
     img_groups = magic_model.get_imgs_v2(page_id)
     table_groups = magic_model.get_tables_v2(page_id)
 
-    img_body_blocks, img_caption_blocks, img_footnote_blocks = process_groups(
+    img_body_blocks, img_caption_blocks, img_footnote_blocks = _process_groups(
         img_groups, "image_body", "image_caption_list", "image_footnote_list"
     )
 
-    table_body_blocks, table_caption_blocks, table_footnote_blocks = process_groups(
+    table_body_blocks, table_caption_blocks, table_footnote_blocks = _process_groups(
         table_groups, "table_body", "table_caption_list", "table_footnote_list"
     )
 
     discarded_blocks = magic_model.get_discarded(page_id)
     text_blocks = magic_model.get_text_blocks(page_id)
     title_blocks = magic_model.get_title_blocks(page_id)
-    inline_equations, interline_equations, interline_equation_blocks = magic_model.get_equations(page_id)
+    _, interline_equations, interline_equation_blocks = magic_model.get_equations(page_id)
     page_w, page_h = magic_model.get_page_size(page_id)
 
-    def merge_title_blocks(blocks, x_distance_threshold=0.1*page_w):
-        def merge_two_bbox(b1, b2):
+    def _merge_title_blocks(blocks, x_distance_threshold=0.1*page_w):
+        def __merge_two_bbox(b1, b2):
             x_min = min(b1["bbox"][0], b2["bbox"][0])
             y_min = min(b1["bbox"][1], b2["bbox"][1])
             x_max = max(b1["bbox"][2], b2["bbox"][2])
             y_max = max(b1["bbox"][3], b2["bbox"][3])
             return x_min, y_min, x_max, y_max
 
-        def merge_two_blocks(b1, b2):
-
-            b1["bbox"] = merge_two_bbox(b1, b2)
-
-
+        def __merge_two_blocks(b1, b2):
+            b1["bbox"] = __merge_two_bbox(b1, b2)
             line1 = b1["lines"][0]
             line2 = b2["lines"][0]
-            line1["bbox"] = merge_two_bbox(line1, line2)
+            line1["bbox"] = __merge_two_bbox(line1, line2)
             line1["spans"].extend(line2["spans"])
-
             return b1, b2
-
 
         y_overlapping_blocks = []
         title_bs = [b for b in blocks if b["type"] == BlockType.Title]
@@ -454,7 +450,6 @@ def parse_page_core(
             if len(row) == 1:
                 continue
 
-
             row.sort(key=lambda x: x["bbox"][0])
 
             merged_block = row[0]
@@ -469,14 +464,14 @@ def parse_page_core(
                     right_block["bbox"][0] - left_block["bbox"][2] < x_distance_threshold
                     and left_height * 0.95 < right_height < left_height * 1.05
                 ):
-                    merged_block, to_remove_block = merge_two_blocks(merged_block, right_block)
+                    merged_block, to_remove_block = __merge_two_blocks(merged_block, right_block)
                     to_remove_blocks.append(to_remove_block)
                 else:
                     merged_block = right_block
         for b in to_remove_blocks:
             blocks.remove(b)
 
-    all_bboxes, all_discarded_blocks = prepare_bboxes_for_layout_split(
+    all_bboxes, all_discarded_blocks = _prepare_bboxes_for_layout_split(
         img_body_blocks,
         img_caption_blocks,
         img_footnote_blocks,
@@ -495,17 +490,17 @@ def parse_page_core(
 
     spans = _remove_outside_spans(spans, all_bboxes, all_discarded_blocks)
 
-    spans, dropped_spans_by_confidence = remove_overlaps_low_confidence_spans(spans)
-    spans, dropped_spans_by_span_overlap = remove_overlaps_min_spans(spans)
+    spans, _ = remove_overlaps_low_confidence_spans(spans)
+    spans, _ = remove_overlaps_min_spans(spans)
 
-    discarded_block_with_spans, spans = fill_spans_in_blocks(
+    discarded_block_with_spans, spans = _fill_spans_in_blocks(
         all_discarded_blocks, spans, 0.4
     )
     fix_discarded_blocks = fix_discarded_block(discarded_block_with_spans)
 
     if len(all_bboxes) == 0:
         logger.warning(f"skip this page, not found useful bbox, page_id: {page_id}")
-        return ocr_construct_page_component(
+        return _construct_page_component(
             [],
             [],
             page_id,
@@ -520,22 +515,27 @@ def parse_page_core(
             drop_reason,
         )
 
-    spans = ocr_cut_image_and_table(
-        spans, page_doc, page_id, pdf_bytes_md5, imageWriter
+    spans = _cut_image_and_table(
+        spans,
+        fitz_page,
+        page_id,
+        pdf_bytes_md5,
+        imageWriter,
     )
-    block_with_spans, spans = fill_spans_in_blocks(all_bboxes, spans, 0.5)
-    fix_blocks = fix_block_spans_v2(block_with_spans)
+    block_with_spans, spans = _fill_spans_in_blocks(all_bboxes, spans, 0.5)
+    fix_blocks = _fix_block_spans(block_with_spans)
 
-    merge_title_blocks(fix_blocks)
+    _merge_title_blocks(fix_blocks)
 
-    line_height = get_line_height(fix_blocks)
+    line_height = _get_line_height(fix_blocks)
 
-    sorted_bboxes = sort(
+    sorted_bboxes = _sort(
         fix_blocks,
         page_w,
         page_h,
         line_height,
-        model=monkeyocr.relation,
+        # rel_pred=monkeyocr.rel_pred,
+        rel_pred=rel_pred,
     )
 
     fix_blocks = _calculate_block_index(fix_blocks, sorted_bboxes)
@@ -548,9 +548,9 @@ def parse_page_core(
         if block["type"] in [BlockType.Image, BlockType.Table]:
             block["blocks"] = sorted(block["blocks"], key=lambda b: b["index"])
 
-    images, tables, interline_equations = get_qa_need_list_v2(sorted_blocks)
+    images, tables, interline_equations = _get_qa_need_list(sorted_blocks)
 
-    page_info = ocr_construct_page_component(
+    page_info = _construct_page_component(
         sorted_blocks,
         [],
         page_id,
@@ -567,9 +567,26 @@ def parse_page_core(
     return page_info
 
 
+def para_split(pdf_info_dict):
+    all_blocks = []
+    for page_num, page in pdf_info_dict.items():
+        blocks = copy.deepcopy(page['preproc_blocks'])
+        for block in blocks:
+            block['page_num'] = page_num
+            block['page_size'] = page['page_size']
+        all_blocks.extend(blocks)
+
+    # __para_merge_page(all_blocks)
+    for page_num, page in pdf_info_dict.items():
+        page['para_blocks'] = []
+        for block in all_blocks:
+            if block['page_num'] == page_num:
+                page['para_blocks'].append(block)
+
+
 def pdf_parse_union(
     model_list,
-    dataset: Dataset,
+    dataset: BaseDataset,
     image_writer,
     monkeyocr: MonkeyOCR,
     start_page_id=0,
@@ -605,19 +622,20 @@ def pdf_parse_union(
             start_time = time_now
 
         if start_page_id <= page_id <= end_page_id:
-            page_info = parse_page_core(
+            page_info = _parse_page_core(
                 page,
                 magic_model,
                 page_id,
                 pdf_bytes_md5,
                 image_writer,
-                monkeyocr,
+                # monkeyocr,
+                rel_pred=monkeyocr.rel_pred,
             )
         else:
             page_info = page.get_page_info()
             page_w = page_info.w
             page_h = page_info.h
-            page_info = ocr_construct_page_component(
+            page_info = _construct_page_component(
                 [],
                 [],
                 page_id,

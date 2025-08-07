@@ -4,7 +4,7 @@ import os
 from typing import List
 
 from magic_pdf.data.data_reader_writer import DataWriter
-from magic_pdf.data.dataset import Dataset
+from magic_pdf.data.dataset import BaseDataset
 from magic_pdf.pdf_parsing import pdf_parse_union
 from magic_pdf.model.monkeyocr import MonkeyOCR
 from magic_pdf.config.make_content_config import DropMode, MakeMode
@@ -16,8 +16,8 @@ from magic_pdf.libs.draw_bbox import (
 )
 
 
-class PipeResult:
-    def __init__(self, pipe_res, dataset: Dataset):
+class ConversionResult:
+    def __init__(self, pipe_res, dataset: BaseDataset):
         """Initialized.
 
         Args:
@@ -172,11 +172,11 @@ class PipeResult:
         draw_span_bbox(pdf_info, self._dataset.data_bits(), dir_name, base_name)
 
 
-class InferenceResult:
+class IntermediateConversionResult:
     def __init__(
         self,
         inference_results: List,
-        dataset: Dataset,
+        dataset: BaseDataset,
     ):
         """Initialized method.
 
@@ -229,14 +229,14 @@ class InferenceResult:
         """
         return self.inference_results
 
-    def pipe_ocr_mode(
+    def make_conversion_result(
         self,
         image_writer: DataWriter,
         monkeyocr: MonkeyOCR,
         start_page_id=0,
         end_page_id=None,
         debug_mode=False,
-    ) -> PipeResult:
+    ) -> ConversionResult:
         """Post-proc the model inference result, Extract the text using `OCR`
         technical.
 
@@ -260,7 +260,7 @@ class InferenceResult:
             end_page_id=end_page_id,
             debug_mode=debug_mode,
         )
-        return PipeResult(
+        return ConversionResult(
             pipe_res=out,
             dataset=self.dataset,
         )

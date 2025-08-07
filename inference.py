@@ -15,7 +15,7 @@ import fitz
 # from magic_pdf.config.chat_content_type import TaskInstructions
 from magic_pdf.data.data_reader_writer import FileBasedDataWriter, FileBasedDataReader
 from magic_pdf.data.dataset import PDFDataset, ImageDataset
-from magic_pdf.model.doc_analysis import doc_analyze
+from magic_pdf.model.conversion import convert
 from magic_pdf.model.monkeyocr import MonkeyOCR
 # from magic_pdf.operators.result import InferenceResult
 
@@ -89,25 +89,25 @@ def parse_folder(
     print("Performing document parsing...")
     start_time = time.time()
 
-    infer_result = doc_analyze(
+    conv_result = convert(
         dataset=dataset,
-        monkeyocr=monkeyocr,
-    )
-    pipe_result = infer_result.pipe_ocr_mode(
         image_writer=image_writer,
         monkeyocr=monkeyocr,
     )
-    
+    # conv_result = conv_result.pipe_ocr_mode(
+    #     image_writer=image_writer,
+    #     monkeyocr=monkeyocr,
+    # )
     parsing_time = time.time() - start_time
     print(f"Parsing time: {parsing_time:.2f}s")
 
-    infer_result.draw_model(os.path.join(local_md_dir, f"{name_without_suff}_draw_model.pdf"))
+    # conv_result.draw_model(os.path.join(local_md_dir, f"{name_without_suff}_draw_model.pdf"))
 
-    pipe_result.draw_layout(os.path.join(local_md_dir, f"{name_without_suff}_draw_layout.pdf"))
-    pipe_result.draw_span(os.path.join(local_md_dir, f"{name_without_suff}_draw_span.pdf"))
-    pipe_result.dump_markdown(md_writer, f"{name_without_suff}_dump_markdown.md", image_dir)
-    pipe_result.dump_content_list(md_writer, f"{name_without_suff}_dump_content_list.json", image_dir)
-    pipe_result.dump_middle_json(md_writer, f'{name_without_suff}_dump_middle.json')
+    conv_result.dump_markdown(md_writer, f"{name_without_suff}_dump_markdown.md", image_dir)  # 우리가 원하는 것.
+    conv_result.draw_layout(os.path.join(local_md_dir, f"{name_without_suff}_draw_layout.pdf"))
+    conv_result.draw_span(os.path.join(local_md_dir, f"{name_without_suff}_draw_span.pdf"))
+    conv_result.dump_content_list(md_writer, f"{name_without_suff}_dump_content_list.json", image_dir)
+    conv_result.dump_middle_json(md_writer, f'{name_without_suff}_dump_middle.json')
 
     print("Results saved to ", local_md_dir)
     return local_md_dir

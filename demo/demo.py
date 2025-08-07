@@ -4,7 +4,7 @@ import time
 
 from magic_pdf.data.data_reader_writer import FileBasedDataWriter, FileBasedDataReader
 from magic_pdf.data.dataset import PDFDataset, ImageDataset
-from MonkeyOCR.magic_pdf.model.doc_analysis import doc_analyze
+from magic_pdf.model.conversion import convert
 from magic_pdf.model.monkeyocr import MonkeyOCR
 import torch.distributed as dist
 
@@ -37,7 +37,7 @@ if __name__ == "__main__":
         ds = ImageDataset(pdf_bytes)
 
     t1 = time.time()
-    infer_result = ds.apply(doc_analyze, MonkeyOCR_model=MonkeyOCR_model)
+    infer_result = ds.apply(convert, MonkeyOCR_model=MonkeyOCR_model)
 
     ## pipeline
     pipe_result = infer_result.pipe_ocr_mode(image_writer, MonkeyOCR_model=MonkeyOCR_model)

@@ -4,7 +4,7 @@ from magic_pdf.config.ocr_content_type import (
     CategoryId,
     ContentType,
 )
-from magic_pdf.data.dataset import Dataset
+from magic_pdf.data.dataset import BaseDataset
 from magic_pdf.model.magic_model import MagicModel
 
 
@@ -295,7 +295,7 @@ def draw_span_bbox(pdf_info, pdf_bytes, out_path, filename):
 
 def draw_model_bbox(
     model_list,
-    dataset: Dataset,
+    dataset: BaseDataset,
     out_path,
     filename,
 ):

@@ -5,7 +5,11 @@ from magic_pdf.config.make_content_config import DropMode, MakeMode
 from magic_pdf.config.ocr_content_type import BlockType, ContentType
 from magic_pdf.libs.commons import join_path
 from magic_pdf.libs.language import detect_lang
-from magic_pdf.post_proc.para_split_v3 import ListLineTag
+
+
+class ListLineTag:
+    IS_LIST_START_LINE = 'is_list_start_line'
+    IS_LIST_END_LINE = 'is_list_end_line'
 
 
 def _ocr_escape_special_markdown_char(content):

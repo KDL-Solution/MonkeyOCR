@@ -185,7 +185,7 @@ def _remove_overlaps_min_blocks(all_bboxes):
     return all_bboxes
 
 
-def prepare_bboxes_for_layout_split(
+def _prepare_bboxes_for_layout_split(
     img_body_blocks,
     img_caption_blocks,
     img_footnote_blocks,

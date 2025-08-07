@@ -62,7 +62,7 @@ def merge_spans_to_line(spans, threshold=0.6):
         return lines
 
 
-def fill_spans_in_blocks(blocks, spans, radio):
+def _fill_spans_in_blocks(blocks, spans, radio):
     block_with_spans = []
     for block in blocks:
         block_type = block[7]
@@ -94,7 +94,7 @@ def fill_spans_in_blocks(blocks, spans, radio):
     return block_with_spans, spans
 
 
-def fix_block_spans_v2(block_with_spans):
+def _fix_block_spans(block_with_spans):
     fix_blocks = []
     for block in block_with_spans:
         block_type = block['type']
