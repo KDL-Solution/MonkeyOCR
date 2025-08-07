@@ -1,25 +1,19 @@
-#!/usr/bin/env python3
-# Copyright (c) Opendatalab. All rights reserved.
 import os
 import time
 import argparse
 import sys
 import logging
-import torch.distributed as dist
+import fitz
 from typing import List
 from pathlib import Path
-import fitz
 
-# import sys
-# sys.path.insert(0, "/home/eric/workspace/MonkeyOCR/")
-# from magic_pdf.config.chat_content_type import TaskInstructions
 from magic_pdf.data.data_reader_writer import FileBasedDataWriter, FileBasedDataReader
-from magic_pdf.data.dataset import PDFDataset, ImageDataset
+from magic_pdf.data.dataset import PDFDataset
 from magic_pdf.model.conversion import convert
 from magic_pdf.model.monkeyocr import MonkeyOCR
 
 
-def to_pdf_bytes(
+def _to_pdf_bytes(
     image_bytes_ls: List[bytes],
 ) -> bytes:
     doc = fitz.open()
@@ -35,56 +29,88 @@ def to_pdf_bytes(
     return doc.tobytes()
 
 
-def parse_folder(
+def _pdf_to_image_bytes_ls(
+    pdf_path: str,
+) -> List[bytes]:
+    doc = fitz.open(pdf_path)
+    image_bytes_list = []
+
+    for page_index in range(len(doc)):
+        page = doc.load_page(page_index)
+        pix = page.get_pixmap(dpi=200)  # 해상도 조절 가능
+
+        # Pixmap → PNG bytes
+        image_bytes = pix.tobytes("png")  # "ppm"도 가능
+        image_bytes_list.append(image_bytes)
+    return image_bytes_list
+
+
+def document_convert_folder(
     in_folder: str,
-    output_dir: str,
+    save_dir: str,
     monkeyocr: MonkeyOCR,
-    debug_mode: bool = False,
 ):
-    """
-    Parse file and save results
-    
-    Args:
-        input_file: Input PDF file path
-        output_dir: Output directory
-        monkeyocr: Pre-initialized model instance
-    """
-    print(f"Starting to parse file: {in_folder}")
-
-    # Check if input file exists
-    if not os.path.exists(in_folder):
-        raise FileNotFoundError(f"Input file does not exist: {in_folder}")
-
-    # Get filename
-    # name_without_suff = '.'.join(os.path.basename(input_file).split(".")[:-1])
-    name_without_suff = "<|1|>"
-    # Prepare output directory
-    local_image_dir = os.path.join(output_dir, name_without_suff, "images")
-    local_md_dir = os.path.join(output_dir, name_without_suff)
-    image_dir = os.path.basename(local_image_dir)
-    os.makedirs(local_image_dir, exist_ok=True)
-    os.makedirs(local_md_dir, exist_ok=True)
-
-    print(f"Output dir: {local_md_dir}")
-    image_writer = FileBasedDataWriter(local_image_dir)
-    md_writer = FileBasedDataWriter(local_md_dir)
+    in_folder = Path(in_folder)
+    save_dir = Path(save_dir) / in_folder.stem
 
     image_paths = [
         i.as_posix()
-        for i in Path(in_folder).glob("*")
+        for i in in_folder.glob("*")
         if "@eaDir" not in i.as_posix()
     ]
     reader = FileBasedDataReader()
-    file_bytes = to_pdf_bytes(
+    document_convert(
         [reader.read_at(i) for i in image_paths],
+        save_dir=save_dir.as_posix(),
+        monkeyocr=monkeyocr,
+    )
+    return save_dir.as_posix()
+
+
+def document_convert_pdf(
+    pdf_path: str,
+    save_dir: str,
+    monkeyocr: MonkeyOCR,
+):
+    save_dir = Path(save_dir) / Path(pdf_path).stem
+
+    image_bytes_ls = _pdf_to_image_bytes_ls(
+        pdf_path=pdf_path,
+    )
+    document_convert(
+        image_bytes_ls,
+        save_dir=save_dir.as_posix(),
+        monkeyocr=monkeyocr,
+    )
+    return save_dir.as_posix()
+
+
+def document_convert(
+    image_bytes_ls: List[bytes],
+    save_dir: str,
+    monkeyocr: MonkeyOCR,
+    debug_mode: bool = True,
+):
+    save_dir = Path(save_dir)
+    images_dir = save_dir / "images"
+    images_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    pdf_bytes = _to_pdf_bytes(
+        image_bytes_ls,
     )
     dataset = PDFDataset(
-        file_bytes,
+        pdf_bytes,
     )
 
     print("Performing document conversion...")
     conv_start = time.time()
 
+    image_writer = FileBasedDataWriter(
+        parent_dir=images_dir.as_posix(),
+    )
     conv_result = convert(
         dataset=dataset,
         image_writer=image_writer,
@@ -94,17 +120,24 @@ def parse_folder(
     conv_time = time.time() - conv_start
     print(f"Document conversion time: {conv_time:.2f}s")
 
-    # conv_result.draw_model(os.path.join(local_md_dir, f"{name_without_suff}_draw_model.pdf"))
+    conv_result.dump_markdown(
+        save_path="document_conversion.md",
+    )  # 우리가 원하는 것.
 
-    conv_result.dump_markdown(md_writer, f"{name_without_suff}_dump_markdown.md", image_dir)  # 우리가 원하는 것.
     if debug_mode:
-        conv_result.draw_layout(os.path.join(local_md_dir, f"{name_without_suff}_draw_layout.pdf"))
-        conv_result.draw_span(os.path.join(local_md_dir, f"{name_without_suff}_draw_span.pdf"))
-        conv_result.dump_content_list(md_writer, f"{name_without_suff}_dump_content_list.json", image_dir)
-        conv_result.dump_middle_json(md_writer, f'{name_without_suff}_dump_middle.json')
-
-    print("Results saved to ", local_md_dir)
-    return local_md_dir
+        # conv_result.draw_model(os.path.join(local_md_dir, f"draw_model.pdf"))
+        conv_result.dump_layout(
+            save_path=(save_dir / "layout.pdf").as_posix(),
+        )
+        conv_result.dump_spans(
+            save_path=(save_dir / "spans.pdf").as_posix(),
+        )
+        conv_result.dump_content_list(
+            save_path=(save_dir / "content_list.json").as_posix(),
+        )
+        conv_result.dump_middle_json(
+            save_path=(save_dir / "middle.json").as_posix(),
+        )
 
 
 def main():
@@ -112,21 +145,21 @@ def main():
         description="PDF Document Parsing Tool",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Usage examples:
-  python parse.py input.pdf                  # Parse single PDF file
-  python parse.py input.pdf -o ./output      # Parse single PDF with custom output dir
-  python parse.py input.pdf -c model_configs.yaml
-  python parse.py image.jpg -t text          # Single task: text recognition
-  python parse.py image.jpg -t table         # Single task: table recognition
-  python parse.py document.pdf -t text       # Single task: text recognition from all PDF pages (with warning)
-  """
+    Usage examples:
+        python parse.py input.pdf                  # Parse single PDF file
+        python parse.py input.pdf -o ./output      # Parse single PDF with custom output dir
+        python parse.py input.pdf -c model_configs.yaml
+        python parse.py image.jpg -t text          # Single task: text recognition
+        python parse.py image.jpg -t table         # Single task: table recognition
+        python parse.py document.pdf -t text       # Single task: text recognition from all PDF pages (with warning)
+    """
 )    
     parser.add_argument(
         "input_path",
         help="Input PDF/image file path or folder path"
     )
     parser.add_argument(
-        "-o", "--output",
+        "--save_dir",
         default="./output",
         help="Output directory (default: ./output)"
     )
@@ -135,12 +168,6 @@ Usage examples:
         "-c", "--config",
         default="model_configs.yaml",
         help="Configuration file path (default: model_configs.yaml)"
-    )
-    
-    parser.add_argument(
-        "-t", "--task",
-        choices=['text', 'table'],
-        help="Single task recognition type (text/table). Supports both image and PDF files."
     )
     parser.add_argument(
         "--log-level",
@@ -161,37 +188,23 @@ Usage examples:
     )
     
     # try:
+    if not os.path.exists(args.input_path):
+        raise FileNotFoundError(f"Input file does not exist: {args.input_path}")
+
     if os.path.isdir(args.input_path):
-        result_dir = parse_folder(
+        result_dir = document_convert_folder(
             args.input_path,
-            args.output,
-            monkeyocr
+            args.save_dir,
+            monkeyocr,
         )
-
-        if args.task:
-            print(f"\n✅ Folder processing with single task ({args.task}) recognition completed! Results saved in: {result_dir}")
-        else:
-            print(f"\n✅ Folder processing completed! Results saved in: {result_dir}")
     elif os.path.isfile(args.input_path):
-        print("Loading model...")
-
-        if args.task:
-            result_dir = single_task_recognition(
-                args.input_path,
-                args.output,
-                monkeyocr,
-                args.task
+        if Path(args.input_path).suffix == ".pdf":
+            result_dir = document_convert_pdf(
+                pdf_path=args.input_path,
+                save_dir=args.save_dir,
+                monkeyocr=monkeyocr,
             )
-            print(f"\n✅ Single task ({args.task}) recognition completed! Results saved in: {result_dir}")
-        else:
-            result_dir = parse_folder(
-                args.input_path,
-                args.output,
-                monkeyocr
-            )
-            print(f"\n✅ Parsing completed! Results saved in: {result_dir}")
-    else:
-        raise FileNotFoundError(f"Input path does not exist: {args.input_path}")
+    print(f"\n✅ Parsing completed! Results saved in: {result_dir}")
 
     # except Exception as e:
     #     print(f"\n❌ Processing failed: {str(e)}", file=sys.stderr)

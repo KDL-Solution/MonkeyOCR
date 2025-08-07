@@ -25,7 +25,10 @@ def _cut_image(
     imageWriter: DataWriter,
 ):
     filename = f'{page_num}_{int(bbox[0])}_{int(bbox[1])}_{int(bbox[2])}_{int(bbox[3])}'
-    img_path = join_path(return_path, filename) if return_path is not None else None
+    img_path = join_path(
+        return_path,
+        filename,
+    ) if return_path is not None else None
     img_hash256_path = f'{_compute_sha256(img_path)}.jpg'
 
     rect = fitz.Rect(*bbox)
@@ -63,7 +66,7 @@ def _cut_image_and_table(
                 fitz_page,
                 return_path=join_path(
                     md5,
-                    type="images",
+                    "images",
                 ),
                 imageWriter=image_writer,
             )

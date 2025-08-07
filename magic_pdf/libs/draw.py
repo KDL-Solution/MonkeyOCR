@@ -86,8 +86,7 @@ def _draw_bbox_with_number(
 def draw_layout(
     pdf_info,
     pdf_bytes,
-    save_dir,
-    filename,
+    save_path: str
 ):
     dropped_bbox_list = []
     tables_list, tables_body_list = [], []
@@ -214,14 +213,13 @@ def draw_layout(
         )
 
     # Save the PDF
-    pdf_docs.save(f"{save_dir}/{filename}")
+    pdf_docs.save(save_path)
 
 
 def draw_spans(
     pdf_info,
     pdf_bytes,
-    save_dir,
-    filename,
+    save_path: str,
 ):
     def _get_span_info(
         span,
@@ -305,14 +303,13 @@ def draw_spans(
         _draw_bbox_without_number(i, dropped_list, page, [158, 158, 158], False)
 
     # Save the PDF
-    pdf_docs.save(f"{save_dir}/{filename}")
+    pdf_docs.save(save_path)
 
 
 def draw_model_bbox(
     conv_results,
     dataset: BaseDataset,
-    save_dir,
-    filename,
+    save_path: str,
 ):
     dropped_bbox_list = []
     tables_body_list, tables_caption_list, tables_footnote_list = [], [], []
@@ -385,4 +382,4 @@ def draw_model_bbox(
         _draw_bbox_with_number(i, interequations_list, page, [0, 255, 0], True)
 
     # Save the PDF
-    dataset.dump_to_file(f"{save_dir}/{filename}")
+    dataset.dump_to_file(save_path)

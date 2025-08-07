@@ -12,7 +12,12 @@ class FileBasedDataReader(DataReader):
         """
         self._parent_dir = parent_dir
 
-    def read_at(self, path: str, offset: int = 0, limit: int = -1) -> bytes:
+    def read_at(
+        self,
+        path: str,
+        offset: int = 0,
+        limit: int = -1,
+    ) -> bytes:
         """Read at offset and limit.
 
         Args:
@@ -36,7 +41,10 @@ class FileBasedDataReader(DataReader):
 
 
 class FileBasedDataWriter(DataWriter):
-    def __init__(self, parent_dir: str = '') -> None:
+    def __init__(
+        self,
+        parent_dir: str = "",
+    ) -> None:
         """Initialized with parent_dir.
 
         Args:
