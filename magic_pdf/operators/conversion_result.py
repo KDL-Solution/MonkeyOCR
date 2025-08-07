@@ -233,8 +233,6 @@ class IntermediateConversionResult:
         self,
         image_writer: DataWriter,
         monkeyocr: MonkeyOCR,
-        start_page_id=0,
-        end_page_id=None,
         debug_mode=False,
     ) -> ConversionResult:
         """Post-proc the model inference result, Extract the text using `OCR`
@@ -256,8 +254,6 @@ class IntermediateConversionResult:
             dataset=self.dataset,
             image_writer=image_writer,
             monkeyocr=monkeyocr,
-            start_page_id=start_page_id,
-            end_page_id=end_page_id,
             debug_mode=debug_mode,
         )
         return ConversionResult(

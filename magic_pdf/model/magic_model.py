@@ -507,7 +507,10 @@ class MagicModel:
             )
         return ret
 
-    def get_images(self, page_no: int):
+    def get_images(
+        self,
+        page_no: int,
+    ) -> List[Dict[str, Any]]:
         with_captions = self.__tie_up_category_by_distance(
             page_no, 3, 4, PosRelationEnum.BOTTOM
         )
@@ -526,7 +529,10 @@ class MagicModel:
             ret.append(record)
         return ret
 
-    def get_tables(self, page_no: int) -> list:
+    def get_tables(
+        self,
+        page_no: int,
+    ) -> List[Dict[str, Any]]:
         with_captions = self.__tie_up_category_by_distance(
             page_no, 5, 6, PosRelationEnum.UP
         )
@@ -546,8 +552,8 @@ class MagicModel:
         return ret
 
     def __get_blocks_by_type(
-        self, type: int, page_no: int, extra_col: list[str] = []
-    ) -> list:
+        self, type: int, page_no: int, extra_col: List[str] = []
+    ) -> List:
         blocks = []
         for page_dict in self.model_list:
             layout_dets = page_dict.get('layout_dets', [])
@@ -572,7 +578,7 @@ class MagicModel:
     def get_model_list(self, page_no):
         return self.model_list[page_no]
 
-    def get_equations(self, page_no: int) -> list:
+    def get_equations(self, page_no: int) -> List:
         inline_equations = self.__get_blocks_by_type(
             ModelBlockTypeEnum.EMBEDDING.value, page_no, ['latex']
         )
@@ -584,19 +590,19 @@ class MagicModel:
         )
         return inline_equations, interline_equations, interline_equations_blocks
 
-    def get_discarded(self, page_no: int) -> list:
+    def get_discarded(self, page_no: int) -> List:
         blocks = self.__get_blocks_by_type(ModelBlockTypeEnum.ABANDON.value, page_no)
         return blocks
 
-    def get_text_blocks(self, page_no: int) -> list:
+    def get_text_blocks(self, page_no: int) -> List:
         blocks = self.__get_blocks_by_type(ModelBlockTypeEnum.PLAIN_TEXT.value, page_no)
         return blocks
 
-    def get_title_blocks(self, page_no: int) -> list:
+    def get_title_blocks(self, page_no: int) -> List:
         blocks = self.__get_blocks_by_type(ModelBlockTypeEnum.TITLE.value, page_no)
         return blocks
 
-    def get_all_spans(self, page_no: int) -> list:
+    def get_all_spans(self, page_no: int) -> List:
         def remove_duplicate_spans(spans):
             new_spans = []
             for span in spans:

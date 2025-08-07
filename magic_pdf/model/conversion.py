@@ -1,8 +1,6 @@
 import time
 import copy
-import time
 import numpy as np
-from loguru import logger
 from loguru import logger
 from PIL import Image
 from typing import List, Dict, Any
@@ -14,75 +12,13 @@ from magic_pdf.libs.clean_memory import clean_memory
 from magic_pdf.operators.conversion_result import IntermediateConversionResult
 from magic_pdf.config.ocr_content_type import CategoryId
 from magic_pdf.config.prompts import PromptConfig
-from magic_pdf.model.sub_modules.model_utils import (
-    clean_vram,
-    crop_img,
-)
+from magic_pdf.model.sub_modules.model_utils import clean_vram
 from magic_pdf.model.monkeyocr import MonkeyOCR
-
-YOLO_LAYOUT_BASE_BATCH_SIZE = 1
-
-
-def layout_det_pre(
-    dataset: BaseDataset,
-) -> List[np.ndarray]:
-    images = []
-    for index in range(len(dataset)):
-        page_data = dataset.get_page(index)
-        img_dict = page_data.get_image()
-        images.append(img_dict["img"])
-    return images
-
-
-def run_layout_det(
-    images: List[np.ndarray],
-    model,
-) -> List[List[Dict[str, Any]]]:
-    layout_start_time = time.time()
-    layout_images = [
-        Image.fromarray(i) for i in images
-    ]
-    layout_det_out: List[List[Dict[str, Any]]] = model(
-        layout_images,
-        batch_size=YOLO_LAYOUT_BASE_BATCH_SIZE,
-    )  # Layout detection model inference.
-    logger.info(
-        f"layout time: {round(time.time() - layout_start_time, 2)}, image num: {len(images)}"
-    )
-    return layout_det_out
-
-
-def layout_det_post(
-    images: List[np.ndarray],
-    layout_det_out,
-) -> Dict[str, List[Any]]:
-    new_images = []
-    cat_ids = []
-    page_indices = []
-    for page_idx in range(len(images)):
-        _layout_det_out: List[Dict[str, Any]] = layout_det_out[page_idx]
-        image = Image.fromarray(images[page_idx])
-
-        _new_images = []
-        _cat_ids = []
-        for layout_el in _layout_det_out:
-            new_image, _ = crop_img(
-                layout_el,
-                image,
-                crop_paste_x=50,
-                crop_paste_y=50,
-            )
-            _new_images.append(new_image)
-            _cat_ids.append(layout_el["category_id"])
-
-        new_images.extend(_new_images)
-        cat_ids.extend(_cat_ids)
-        page_indices.append(len(new_images) - len(_new_images))
-    return {
-        "images": new_images,
-        "category_ids": cat_ids,
-        "page_indices": page_indices,
-    }
+from magic_pdf.model.sub_modules.layout_detection.doclayoutyolo import (
+    layout_det_pre,
+    run_layout_det,
+    layout_det_post,
+)
 
 
 def run_llm(

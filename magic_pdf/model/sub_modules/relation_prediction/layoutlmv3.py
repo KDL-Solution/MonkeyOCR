@@ -3,37 +3,35 @@ from collections import defaultdict
 from typing import List, Dict
 from transformers import LayoutLMv3ForTokenClassification
 
-# MAX_LEN = 510
-CLS_TOKEN_ID = 0
-UNK_TOKEN_ID = 3
-EOS_TOKEN_ID = 2
 
-
-def boxes2inputs(boxes: List[List[int]]) -> Dict[str, torch.Tensor]:
+def rel_pred_pre(
+    boxes: List[List[int]],
+    model: LayoutLMv3ForTokenClassification,
+    cls_token_id = 0,
+    unk_token_id = 3,
+    eos_token_id = 2,
+) -> Dict[str, torch.Tensor]:
     bbox = [[0, 0, 0, 0]] + boxes + [[0, 0, 0, 0]]
-    input_ids = [CLS_TOKEN_ID] + [UNK_TOKEN_ID] * len(boxes) + [EOS_TOKEN_ID]
+    input_ids = [cls_token_id] + [unk_token_id] * len(boxes) + [eos_token_id]
     attention_mask = [1] + [1] * len(boxes) + [1]
-    return {
+    inputs = {
         "bbox": torch.tensor([bbox]),
         "attention_mask": torch.tensor([attention_mask]),
         "input_ids": torch.tensor([input_ids]),
     }
-
-
-def prepare_inputs(
-    inputs: Dict[str, torch.Tensor],
-    model: LayoutLMv3ForTokenClassification,
-) -> Dict[str, torch.Tensor]:
-    ret = {}
+    new_inputs = {}
     for k, v in inputs.items():
         v = v.to(model.device)
         if torch.is_floating_point(v):
             v = v.to(model.dtype)
-        ret[k] = v
-    return ret
+        new_inputs[k] = v
+    return new_inputs
 
 
-def parse_logits(logits: torch.Tensor, length: int) -> List[int]:
+def rel_pred_post(
+    logits: torch.Tensor,
+    length: int,
+) -> List[int]:
     """
     parse logits to orders
 
@@ -65,3 +63,15 @@ def parse_logits(logits: torch.Tensor, length: int) -> List[int]:
             for idx, _ in idxes_to_logit[1:]:
                 ret[idx] = orders[idx].pop()
     return ret
+
+
+def run_rel_pred(
+    boxes: List[List[int]],
+    model,
+) -> List[int]:
+    inputs = rel_pred_pre(
+        boxes,
+        model=model,
+    )
+    logits = model(**inputs).logits.cpu().squeeze(0)
+    return rel_pred_post(logits, len(boxes))

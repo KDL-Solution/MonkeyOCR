@@ -10,7 +10,7 @@ from collections import defaultdict
 from transformers import LayoutLMv3ForTokenClassification
 
 from magic_pdf.utils.load_image import load_image
-from magic_pdf.model.sub_modules.layout_detection.doclayout_yolo import DocLayoutYOLO
+from magic_pdf.model.sub_modules.layout_detection.doclayoutyolo import DocLayoutYOLO
 
 
 class LLM:
