@@ -79,7 +79,6 @@ def layout_det_post(
         cat_ids.extend(_cat_ids)
         page_indices.append(len(new_images) - len(_new_images))
     return {
-        # "layout_detection_output": layout_det_out,
         "images": new_images,
         "category_ids": cat_ids,
         "page_indices": page_indices,
@@ -251,10 +250,6 @@ def convert(
         f"document conversion time: {round(time.time() - conv_start, 2)},"
         f"speed: {conv_speed} pages/second"
     )
-    # return InferenceResult(
-    #     model_json,
-    #     dataset,
-    # )
     ### Relation prediction:
     return IntermediateConversionResult(
         model_json,
@@ -263,4 +258,4 @@ def convert(
         image_writer=image_writer,
         monkeyocr=monkeyocr,
     )
-### : Relation prediction
+    ### : Relation prediction

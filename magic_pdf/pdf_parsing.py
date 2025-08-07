@@ -5,28 +5,28 @@ import torch
 import hashlib
 import copy
 import numpy as np
-from typing import List
+from typing import List, Dict, Any
 from loguru import logger
 
 from magic_pdf.config.ocr_content_type import BlockType, ContentType
 from magic_pdf.data.dataset import BaseDataset, FitzPage
-from magic_pdf.libs.boxbase import (
+from magic_pdf.libs.bbox import (
     calculate_overlap_area_in_bbox1_area_ratio,
     __is_overlaps_y_exceeds_threshold,
 )
 from magic_pdf.libs.clean_memory import clean_memory
 from magic_pdf.model.magic_model import MagicModel
 from magic_pdf.pre_proc.cut_image import _cut_image_and_table
-from magic_pdf.pre_proc.ocr_detect_all_bboxes import _prepare_bboxes_for_layout_split
-from magic_pdf.pre_proc.ocr_dict_merge import (
+from magic_pdf.pre_proc.bboxes_detection import _prepare_bboxes_for_layout_split
+from magic_pdf.pre_proc.dict_merge import (
     _fill_spans_in_blocks,
     _fix_block_spans,
     fix_discarded_block,
 )
-from magic_pdf.pre_proc.ocr_span_list_modify import (
+from magic_pdf.pre_proc.span_list_modification import (
     _get_qa_need_list,
-    remove_overlaps_low_confidence_spans,
-    remove_overlaps_min_spans,
+    _remove_overlaps_low_confidence_spans,
+    _remove_overlaps_min_spans,
 )
 from magic_pdf.model.monkeyocr import MonkeyOCR
 from magic_pdf.model.sub_modules.reading_order.layoutreader.xycut import recursive_xy_cut
@@ -37,7 +37,7 @@ from magic_pdf.model.sub_modules.reading_order.layoutreader.helpers import (
 )
 
 
-def compute_md5(file_bytes):
+def _compute_md5(file_bytes):
     hasher = hashlib.md5()
     hasher.update(file_bytes)
     return hasher.hexdigest().upper()
@@ -220,7 +220,6 @@ def _sort(
     if len(page_line_list) > 200:
         return None
 
-
     x_scale = 1000. / page_w
     y_scale = 1000. / page_h
     boxes = []
@@ -377,8 +376,71 @@ def _remove_outside_spans(spans, all_bboxes, all_discarded_blocks):
             if any(calculate_overlap_area_in_bbox1_area_ratio(span_bbox, block_bbox) > 0.5 for block_bbox in
                    other_block_bboxes):
                 new_spans.append(span)
-
     return new_spans
+
+
+def _merge_title_blocks(
+    blocks,
+    x_distance_threshold,
+):
+    def __merge_two_bbox(b1, b2):
+        x_min = min(b1["bbox"][0], b2["bbox"][0])
+        y_min = min(b1["bbox"][1], b2["bbox"][1])
+        x_max = max(b1["bbox"][2], b2["bbox"][2])
+        y_max = max(b1["bbox"][3], b2["bbox"][3])
+        return x_min, y_min, x_max, y_max
+
+    def __merge_two_blocks(b1, b2):
+        b1["bbox"] = __merge_two_bbox(b1, b2)
+        line1 = b1["lines"][0]
+        line2 = b2["lines"][0]
+        line1["bbox"] = __merge_two_bbox(line1, line2)
+        line1["spans"].extend(line2["spans"])
+        return b1, b2
+
+    y_overlapping_blocks = []
+    title_bs = [b for b in blocks if b["type"] == BlockType.Title]
+    while title_bs:
+        block1 = title_bs.pop(0)
+        current_row = [block1]
+        to_remove = []
+        for block2 in title_bs:
+            if (
+                __is_overlaps_y_exceeds_threshold(block1["bbox"], block2["bbox"], 0.9)
+                and len(block1["lines"]) == 1
+                and len(block2["lines"]) == 1
+            ):
+                current_row.append(block2)
+                to_remove.append(block2)
+        for b in to_remove:
+            title_bs.remove(b)
+        y_overlapping_blocks.append(current_row)
+
+    to_remove_blocks = []
+    for row in y_overlapping_blocks:
+        if len(row) == 1:
+            continue
+
+        row.sort(key=lambda x: x["bbox"][0])
+
+        merged_block = row[0]
+        for i in range(1, len(row)):
+            left_block = merged_block
+            right_block = row[i]
+
+            left_height = left_block["bbox"][3] - left_block["bbox"][1]
+            right_height = right_block["bbox"][3] - right_block["bbox"][1]
+
+            if (
+                right_block["bbox"][0] - left_block["bbox"][2] < x_distance_threshold
+                and left_height * 0.95 < right_height < left_height * 1.05
+            ):
+                merged_block, to_remove_block = __merge_two_blocks(merged_block, right_block)
+                to_remove_blocks.append(to_remove_block)
+            else:
+                merged_block = right_block
+    for b in to_remove_blocks:
+        blocks.remove(b)
 
 
 def _parse_page_core(
@@ -387,21 +449,23 @@ def _parse_page_core(
     page_id,
     pdf_bytes_md5,
     imageWriter,
-    # monkeyocr: MonkeyOCR,
     rel_pred,
+    need_drop = False,  # Fixed.
+    drop_reason = [],  # Fixed.
 ):
-    need_drop = False
-    drop_reason = []
-
-    img_groups = magic_model.get_imgs_v2(page_id)
-    table_groups = magic_model.get_tables_v2(page_id)
-
+    img_groups = magic_model.get_images(page_id)
+    table_groups = magic_model.get_tables(page_id)
     img_body_blocks, img_caption_blocks, img_footnote_blocks = _process_groups(
-        img_groups, "image_body", "image_caption_list", "image_footnote_list"
+        img_groups,
+        "image_body",
+        "image_caption_list",
+        "image_footnote_list",
     )
-
     table_body_blocks, table_caption_blocks, table_footnote_blocks = _process_groups(
-        table_groups, "table_body", "table_caption_list", "table_footnote_list"
+        table_groups,
+        "table_body",
+        "table_caption_list",
+        "table_footnote_list",
     )
 
     discarded_blocks = magic_model.get_discarded(page_id)
@@ -409,67 +473,6 @@ def _parse_page_core(
     title_blocks = magic_model.get_title_blocks(page_id)
     _, interline_equations, interline_equation_blocks = magic_model.get_equations(page_id)
     page_w, page_h = magic_model.get_page_size(page_id)
-
-    def _merge_title_blocks(blocks, x_distance_threshold=0.1*page_w):
-        def __merge_two_bbox(b1, b2):
-            x_min = min(b1["bbox"][0], b2["bbox"][0])
-            y_min = min(b1["bbox"][1], b2["bbox"][1])
-            x_max = max(b1["bbox"][2], b2["bbox"][2])
-            y_max = max(b1["bbox"][3], b2["bbox"][3])
-            return x_min, y_min, x_max, y_max
-
-        def __merge_two_blocks(b1, b2):
-            b1["bbox"] = __merge_two_bbox(b1, b2)
-            line1 = b1["lines"][0]
-            line2 = b2["lines"][0]
-            line1["bbox"] = __merge_two_bbox(line1, line2)
-            line1["spans"].extend(line2["spans"])
-            return b1, b2
-
-        y_overlapping_blocks = []
-        title_bs = [b for b in blocks if b["type"] == BlockType.Title]
-        while title_bs:
-            block1 = title_bs.pop(0)
-            current_row = [block1]
-            to_remove = []
-            for block2 in title_bs:
-                if (
-                    __is_overlaps_y_exceeds_threshold(block1["bbox"], block2["bbox"], 0.9)
-                    and len(block1["lines"]) == 1
-                    and len(block2["lines"]) == 1
-                ):
-                    current_row.append(block2)
-                    to_remove.append(block2)
-            for b in to_remove:
-                title_bs.remove(b)
-            y_overlapping_blocks.append(current_row)
-
-
-        to_remove_blocks = []
-        for row in y_overlapping_blocks:
-            if len(row) == 1:
-                continue
-
-            row.sort(key=lambda x: x["bbox"][0])
-
-            merged_block = row[0]
-            for i in range(1, len(row)):
-                left_block = merged_block
-                right_block = row[i]
-
-                left_height = left_block["bbox"][3] - left_block["bbox"][1]
-                right_height = right_block["bbox"][3] - right_block["bbox"][1]
-
-                if (
-                    right_block["bbox"][0] - left_block["bbox"][2] < x_distance_threshold
-                    and left_height * 0.95 < right_height < left_height * 1.05
-                ):
-                    merged_block, to_remove_block = __merge_two_blocks(merged_block, right_block)
-                    to_remove_blocks.append(to_remove_block)
-                else:
-                    merged_block = right_block
-        for b in to_remove_blocks:
-            blocks.remove(b)
 
     all_bboxes, all_discarded_blocks = _prepare_bboxes_for_layout_split(
         img_body_blocks,
@@ -487,14 +490,17 @@ def _parse_page_core(
     )
 
     spans = magic_model.get_all_spans(page_id)
-
-    spans = _remove_outside_spans(spans, all_bboxes, all_discarded_blocks)
-
-    spans, _ = remove_overlaps_low_confidence_spans(spans)
-    spans, _ = remove_overlaps_min_spans(spans)
-
+    spans = _remove_outside_spans(
+        spans,
+        all_bboxes,
+        all_discarded_blocks,
+    )
+    spans, _ = _remove_overlaps_low_confidence_spans(spans)
+    spans, _ = _remove_overlaps_min_spans(spans)
     discarded_block_with_spans, spans = _fill_spans_in_blocks(
-        all_discarded_blocks, spans, 0.4
+        blocks=all_discarded_blocks,
+        spans=spans,
+        ratio=0.4
     )
     fix_discarded_blocks = fix_discarded_block(discarded_block_with_spans)
 
@@ -522,26 +528,30 @@ def _parse_page_core(
         pdf_bytes_md5,
         imageWriter,
     )
-    block_with_spans, spans = _fill_spans_in_blocks(all_bboxes, spans, 0.5)
+    block_with_spans, spans = _fill_spans_in_blocks(
+        all_bboxes,
+        spans,
+        0.5,
+    )
     fix_blocks = _fix_block_spans(block_with_spans)
 
-    _merge_title_blocks(fix_blocks)
-
-    line_height = _get_line_height(fix_blocks)
-
-    sorted_bboxes = _sort(
+    _merge_title_blocks(
         fix_blocks,
-        page_w,
-        page_h,
-        line_height,
-        # rel_pred=monkeyocr.rel_pred,
+        x_distance_threshold=0.1 * page_w,
+    )
+    line_height = _get_line_height(fix_blocks)
+    _sorted_bboxes = _sort(
+        fix_blocks=fix_blocks,
+        page_w=page_w,
+        page_h=page_h,
+        line_height=line_height,
         rel_pred=rel_pred,
     )
-
-    fix_blocks = _calculate_block_index(fix_blocks, sorted_bboxes)
-
+    fix_blocks = _calculate_block_index(
+        fix_blocks=fix_blocks,
+        sorted_bboxes=_sorted_bboxes,
+    )
     fix_blocks = _revert_group_blocks(fix_blocks)
-
     sorted_blocks = sorted(fix_blocks, key=lambda b: b["index"])
 
     for block in sorted_blocks:
@@ -549,7 +559,6 @@ def _parse_page_core(
             block["blocks"] = sorted(block["blocks"], key=lambda b: b["index"])
 
     images, tables, interline_equations = _get_qa_need_list(sorted_blocks)
-
     page_info = _construct_page_component(
         sorted_blocks,
         [],
@@ -567,7 +576,7 @@ def _parse_page_core(
     return page_info
 
 
-def para_split(pdf_info_dict):
+def _para_split(pdf_info_dict):
     all_blocks = []
     for page_num, page in pdf_info_dict.items():
         blocks = copy.deepcopy(page['preproc_blocks'])
@@ -584,8 +593,8 @@ def para_split(pdf_info_dict):
                 page['para_blocks'].append(block)
 
 
-def pdf_parse_union(
-    model_list,
+def postprocess(
+    model_list: List[Dict[str, Any]],
     dataset: BaseDataset,
     image_writer,
     monkeyocr: MonkeyOCR,
@@ -593,7 +602,7 @@ def pdf_parse_union(
     end_page_id=None,
     debug_mode=False,
 ):
-    pdf_bytes_md5 = compute_md5(dataset.data_bits())
+    pdf_bytes_md5 = _compute_md5(dataset.data_bits())
 
     magic_model = MagicModel(
         model_list,
@@ -628,7 +637,6 @@ def pdf_parse_union(
                 page_id,
                 pdf_bytes_md5,
                 image_writer,
-                # monkeyocr,
                 rel_pred=monkeyocr.rel_pred,
             )
         else:
@@ -651,7 +659,7 @@ def pdf_parse_union(
             )
         pdf_info_dict[f"page_{page_id}"] = page_info
 
-    para_split(pdf_info_dict)
+    _para_split(pdf_info_dict)
 
     pdf_info_list = _dict_to_list(pdf_info_dict)
     new_pdf_info_dict = {

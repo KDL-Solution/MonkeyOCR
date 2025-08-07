@@ -5,10 +5,10 @@ from typing import List
 
 from magic_pdf.data.data_reader_writer import DataWriter
 from magic_pdf.data.dataset import BaseDataset
-from magic_pdf.pdf_parsing import pdf_parse_union
+from magic_pdf.pdf_parsing import postprocess
 from magic_pdf.model.monkeyocr import MonkeyOCR
 from magic_pdf.config.make_content_config import DropMode, MakeMode
-from magic_pdf.dict2md.ocr_mkcontent import union_make
+from magic_pdf.dict2md.content import union_make
 from magic_pdf.libs.draw_bbox import (
     draw_model_bbox,
     draw_layout_bbox,
@@ -251,7 +251,7 @@ class IntermediateConversionResult:
             PipeResult: the result
         """
 
-        out = pdf_parse_union(
+        out = postprocess(
             copy.deepcopy(self.inference_results),
             dataset=self.dataset,
             image_writer=image_writer,

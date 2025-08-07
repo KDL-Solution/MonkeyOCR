@@ -94,10 +94,6 @@ def parse_folder(
         image_writer=image_writer,
         monkeyocr=monkeyocr,
     )
-    # conv_result = conv_result.pipe_ocr_mode(
-    #     image_writer=image_writer,
-    #     monkeyocr=monkeyocr,
-    # )
     parsing_time = time.time() - start_time
     print(f"Parsing time: {parsing_time:.2f}s")
 

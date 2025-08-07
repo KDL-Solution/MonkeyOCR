@@ -1,5 +1,5 @@
 from magic_pdf.config.ocr_content_type import BlockType, ContentType
-from magic_pdf.libs.boxbase import (
+from magic_pdf.libs.bbox import (
     __is_overlaps_y_exceeds_threshold,
     calculate_overlap_area_in_bbox1_area_ratio,
 )
@@ -33,8 +33,6 @@ def merge_spans_to_line(spans, threshold=0.6):
         lines = []
         current_line = [spans[0]]
         for span in spans[1:]:
-
-
             if span['type'] in [
                     ContentType.InterlineEquation, ContentType.Image,
                     ContentType.Table
@@ -62,7 +60,11 @@ def merge_spans_to_line(spans, threshold=0.6):
         return lines
 
 
-def _fill_spans_in_blocks(blocks, spans, radio):
+def _fill_spans_in_blocks(
+    blocks,
+    spans,
+    ratio: float,
+):
     block_with_spans = []
     for block in blocks:
         block_type = block[7]
@@ -80,7 +82,9 @@ def _fill_spans_in_blocks(blocks, spans, radio):
         for span in spans:
             span_bbox = span['bbox']
             if calculate_overlap_area_in_bbox1_area_ratio(
-                    span_bbox, block_bbox) > radio:
+                    span_bbox,
+                    block_bbox
+                ) > ratio:
                 block_spans.append(span)
 
         block_dict['spans'] = block_spans
