@@ -1,9 +1,7 @@
 import os
 
-from magic_pdf.data.data_reader_writer.base import DataReader, DataWriter
 
-
-class FileBasedDataReader(DataReader):
+class FileBasedDataReader(object):
     def __init__(self, parent_dir: str = ''):
         """Initialized with parent_dir.
 
@@ -40,7 +38,7 @@ class FileBasedDataReader(DataReader):
                 return f.read(limit)
 
 
-class FileBasedDataWriter(DataWriter):
+class FileBasedDataWriter(object):
     def __init__(
         self,
         parent_dir: str = "",

@@ -1,8 +1,77 @@
 import regex
+from enum import Enum
 from io import StringIO
 from docling_core.types.doc.document import DocTagsDocument, DoclingDocument
 
-from magic_pdf.config.ocr_content_type import CategoryId
+
+class ContentType:
+    Image = "image"
+    Table = "table"
+    Text = "text"
+    InlineEquation = "inline_equation"
+    InterlineEquation = "interline_equation"
+
+
+class BlockType:
+    Image = "image"
+    ImageBody = "image_body"
+    ImageCaption = "image_caption"
+    ImageFootnote = "image_footnote"
+    Table = "table"
+    TableBody = "table_body"
+    TableCaption = "table_caption"
+    TableFootnote = "table_footnote"
+    Text = "text"
+    Title = "title"
+    InterlineEquation = "interline_equation"
+    Footnote = "footnote"
+    Discarded = "discarded"
+    List = "list"
+    Index = "index"
+
+
+class CategoryId:
+    Title = 0  # -> `OcrText`.
+    Text = 1  # -> `OcrText`.
+    Abandon = 2  # -> `OcrText`.
+    ImageBody = 3
+    ImageCaption = 4  # -> `OcrText`.
+    TableBody = 5
+    TableCaption = 6  # -> `OcrText`.
+    TableFootnote = 7  # -> `OcrText`.
+    InterlineEquation_Layout = 8  # -> `InterlineEquation_Layout`.
+    # InlineEquation = 13
+    InterlineEquation_YOLO = 14  # -> `InterlineEquation_Layout`.
+    OcrText = 15
+    ImageFootnote = 101  # -> `OcrText`.
+
+
+class ModelBlockType(Enum):
+    TITLE = 0
+    PLAIN_TEXT = 1
+    ABANDON = 2
+    ISOLATE_FORMULA = 8
+    EMBEDDING = 13
+    ISOLATED = 14
+
+
+class Mode:
+    MARKDOWN = "markdown"
+    STANDARD = "standard"
+
+
+class ModelNames:
+    TEXT = "Qwen2.5-VL-7B-Instruct"
+    FORMULA = "Qwen2.5-VL-7B-Instruct"
+    IMAGE = "Qwen2.5-VL-7B-Instruct"
+    TABLE = "table_image_otsl"
+
+
+class Prompts:
+    TEXT = "Please output the text content from the image. do not output any other content."
+    FORMULA = "Please write out the expression of the formula in the image using LaTeX format."
+    IMAGE = "Write a caption describing the image."
+    TABLE = "Parse the table in the image."
 
 
 def sanitize_md(
@@ -48,20 +117,6 @@ def sanitize_html(
     if cleaned is None:
         return "<html>\n"+output.replace("```html","<html>").replace("```","</html>").strip()+"\n</html>"
     return f"""{cleaned[0].replace("```html","<html>").replace("```","</html>").strip()}"""
-
-
-class ModelNames:
-    TEXT = "Qwen2.5-VL-7B-Instruct"
-    FORMULA = "Qwen2.5-VL-7B-Instruct"
-    IMAGE = "Qwen2.5-VL-7B-Instruct"
-    TABLE = "table_image_otsl"
-
-
-class Prompts:
-    TEXT = "Please output the text content from the image."
-    FORMULA = "Please write out the expression of the formula in the image using LaTeX format."
-    IMAGE = "Write a caption describing the image."
-    TABLE = "Parse the table in the image."
 
 
 class PromptConfig:

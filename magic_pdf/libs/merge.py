@@ -1,11 +1,17 @@
-from magic_pdf.config.ocr_content_type import BlockType, ContentType
+import copy
+from typing import List, Dict, Any, Tuple
+from loguru import logger
+
+from magic_pdf.config import BlockType, ContentType
 from magic_pdf.libs.bbox import (
-    __is_overlaps_y_exceeds_threshold,
     calculate_overlap_area_in_bbox1_area_ratio,
+    __is_overlaps_y_exceeds_threshold,
 )
 
 
-def line_sort_spans_by_left_to_right(lines):
+def _line_sort_spans_by_left_to_right(
+    lines,
+):
     line_objects = []
     for line in lines:
 
@@ -23,7 +29,10 @@ def line_sort_spans_by_left_to_right(lines):
     return line_objects
 
 
-def merge_spans_to_line(spans, threshold=0.6):
+def _merge_spans_to_line(
+    spans,
+    threshold: float = 0.6,
+):
     if len(spans) == 0:
         return []
     else:
@@ -98,46 +107,58 @@ def _fill_spans_in_blocks(
     return block_with_spans, spans
 
 
-def _fix_block_spans(block_with_spans):
+def _fix_interline_block(
+    block,
+):
+    block_lines = _merge_spans_to_line(block['spans'])
+    sort_block_lines = _line_sort_spans_by_left_to_right(block_lines)
+    block['lines'] = sort_block_lines
+    del block['spans']
+    return block
+
+
+def _fix_text_block(
+    block,
+):
+    for span in block['spans']:
+        if span['type'] == ContentType.InterlineEquation:
+            span['type'] = ContentType.InlineEquation
+    block_lines = _merge_spans_to_line(block['spans'])
+    sort_block_lines = _line_sort_spans_by_left_to_right(block_lines)
+    block['lines'] = sort_block_lines
+    del block['spans']
+    return block
+
+
+def _fix_block_spans(
+    block_with_spans,
+):
     fix_blocks = []
     for block in block_with_spans:
         block_type = block['type']
 
-        if block_type in [BlockType.Text, BlockType.Title,
-                          BlockType.ImageCaption, BlockType.ImageFootnote,
-                          BlockType.TableCaption, BlockType.TableFootnote
-                          ]:
-            block = fix_text_block(block)
+        if block_type in [
+            BlockType.Text,
+            BlockType.Title,
+            BlockType.ImageCaption,
+            BlockType.ImageFootnote,
+            BlockType.TableCaption,
+            BlockType.TableFootnote,
+        ]:
+            block = _fix_text_block(block)
         elif block_type in [BlockType.InterlineEquation, BlockType.ImageBody, BlockType.TableBody]:
-            block = fix_interline_block(block)
+            block = _fix_interline_block(block)
         else:
             continue
         fix_blocks.append(block)
     return fix_blocks
 
 
-def _fix_discarded_block(discarded_block_with_spans):
+def _fix_discarded_block(
+    discarded_block_with_spans,
+):
     fix_discarded_blocks = []
     for block in discarded_block_with_spans:
-        block = fix_text_block(block)
+        block = _fix_text_block(block)
         fix_discarded_blocks.append(block)
     return fix_discarded_blocks
-
-
-def fix_text_block(block):
-    for span in block['spans']:
-        if span['type'] == ContentType.InterlineEquation:
-            span['type'] = ContentType.InlineEquation
-    block_lines = merge_spans_to_line(block['spans'])
-    sort_block_lines = line_sort_spans_by_left_to_right(block_lines)
-    block['lines'] = sort_block_lines
-    del block['spans']
-    return block
-
-
-def fix_interline_block(block):
-    block_lines = merge_spans_to_line(block['spans'])
-    sort_block_lines = line_sort_spans_by_left_to_right(block_lines)
-    block['lines'] = sort_block_lines
-    del block['spans']
-    return block

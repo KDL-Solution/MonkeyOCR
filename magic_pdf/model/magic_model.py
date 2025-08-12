@@ -1,8 +1,7 @@
 import enum
 from typing import List, Dict, Any
 
-from magic_pdf.config.model_block_type import ModelBlockTypeEnum
-from magic_pdf.config.ocr_content_type import CategoryId, ContentType
+from magic_pdf.config import ModelBlockType, CategoryId, ContentType
 from magic_pdf.data.dataset import BaseDataset
 from magic_pdf.libs.bbox import (
     _is_in,
@@ -585,26 +584,26 @@ class MagicModel:
 
     def get_equations(self, page_no: int) -> List:
         inline_equations = self.__get_blocks_by_type(
-            ModelBlockTypeEnum.EMBEDDING.value, page_no, ["latex"]
+            ModelBlockType.EMBEDDING.value, page_no, ["latex"]
         )
         interline_equations = self.__get_blocks_by_type(
-            ModelBlockTypeEnum.ISOLATED.value, page_no, ["latex"]
+            ModelBlockType.ISOLATED.value, page_no, ["latex"]
         )
         interline_equations_blocks = self.__get_blocks_by_type(
-            ModelBlockTypeEnum.ISOLATE_FORMULA.value, page_no
+            ModelBlockType.ISOLATE_FORMULA.value, page_no
         )
         return inline_equations, interline_equations, interline_equations_blocks
 
     def get_discarded(self, page_no: int) -> List:
-        blocks = self.__get_blocks_by_type(ModelBlockTypeEnum.ABANDON.value, page_no)
+        blocks = self.__get_blocks_by_type(ModelBlockType.ABANDON.value, page_no)
         return blocks
 
     def get_text_blocks(self, page_no: int) -> List:
-        blocks = self.__get_blocks_by_type(ModelBlockTypeEnum.PLAIN_TEXT.value, page_no)
+        blocks = self.__get_blocks_by_type(ModelBlockType.PLAIN_TEXT.value, page_no)
         return blocks
 
     def get_title_blocks(self, page_no: int) -> List:
-        blocks = self.__get_blocks_by_type(ModelBlockTypeEnum.TITLE.value, page_no)
+        blocks = self.__get_blocks_by_type(ModelBlockType.TITLE.value, page_no)
         return blocks
 
     def get_all_spans(self, page_no: int) -> List:

@@ -7,9 +7,9 @@ import fitz
 from typing import List
 from pathlib import Path
 
-from magic_pdf.data.data_reader_writer import FileBasedDataWriter, FileBasedDataReader
+from magic_pdf.data.filebase import FileBasedDataWriter, FileBasedDataReader
 from magic_pdf.data.dataset import PDFDataset
-from magic_pdf.model.conversion import convert
+from magic_pdf.model.conversion import Conversion
 from magic_pdf.model.monkeyocr import MonkeyOCR
 
 
@@ -111,17 +111,19 @@ def document_convert(
     image_writer = FileBasedDataWriter(
         parent_dir=images_dir.as_posix(),
     )
-    conv_result = convert(
-        dataset=dataset,
+    conv = Conversion(
         image_writer=image_writer,
         monkeyocr=monkeyocr,
+    )
+    conv_result = conv(
+        dataset,
     )
 
     conv_time = time.time() - conv_start
     print(f"Document conversion time: {conv_time:.2f}s")
 
     conv_result.dump_markdown(
-        save_path="document_conversion.md",
+        save_path=(save_dir / "document_conversion.md").as_posix(),
     )  # 우리가 원하는 것.
 
     if debug_mode:
@@ -144,16 +146,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="PDF Document Parsing Tool",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-    Usage examples:
-        python parse.py input.pdf                  # Parse single PDF file
-        python parse.py input.pdf -o ./output      # Parse single PDF with custom output dir
-        python parse.py input.pdf -c model_configs.yaml
-        python parse.py image.jpg -t text          # Single task: text recognition
-        python parse.py image.jpg -t table         # Single task: table recognition
-        python parse.py document.pdf -t text       # Single task: text recognition from all PDF pages (with warning)
-    """
-)    
+    )
     parser.add_argument(
         "input_path",
         help="Input PDF/image file path or folder path"
@@ -186,7 +179,7 @@ def main():
     monkeyocr = MonkeyOCR(
         args.config,
     )
-    
+
     # try:
     if not os.path.exists(args.input_path):
         raise FileNotFoundError(f"Input file does not exist: {args.input_path}")

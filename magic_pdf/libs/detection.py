@@ -1,4 +1,4 @@
-from magic_pdf.config.ocr_content_type import BlockType
+from magic_pdf.config import BlockType
 from magic_pdf.libs.bbox import (
     calculate_iou,
     calculate_overlap_area_in_bbox1_area_ratio,

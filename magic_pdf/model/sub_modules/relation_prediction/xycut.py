@@ -74,8 +74,6 @@ def _recursive_xy_cut(
     y_sorted_boxes = boxes[_indices]
     y_sorted_indices = indices[_indices]
 
-    # debug_vis(y_sorted_boxes, y_sorted_indices)
-
     y_projection = __projection_by_bboxes(boxes=y_sorted_boxes, axis=1)
     pos_y = __split_projection_profile(y_projection, 0, 1)
     if not pos_y:

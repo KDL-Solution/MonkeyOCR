@@ -3,9 +3,9 @@ import hashlib
 from typing import Tuple
 from loguru import logger
 
-from magic_pdf.config.ocr_content_type import ContentType
+from magic_pdf.config import ContentType
 from magic_pdf.libs.commons import join_path
-from magic_pdf.data.data_reader_writer import DataWriter
+from magic_pdf.data.filebase import FileBasedDataWriter
 
 
 def _compute_sha256(
@@ -22,7 +22,7 @@ def _cut_image(
     page_num: int,
     page: fitz.Page,
     return_path,
-    imageWriter: DataWriter,
+    imageWriter: FileBasedDataWriter,
 ):
     filename = f'{page_num}_{int(bbox[0])}_{int(bbox[1])}_{int(bbox[2])}_{int(bbox[3])}'
     img_path = join_path(

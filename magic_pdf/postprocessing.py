@@ -1,7 +1,6 @@
 import copy
 import statistics
 import time
-import torch
 import torch.nn as nn
 import hashlib
 import copy
@@ -9,31 +8,31 @@ import numpy as np
 from typing import List, Dict, Any, Tuple
 from loguru import logger
 
-from magic_pdf.config.ocr_content_type import BlockType, ContentType
+from magic_pdf.config import BlockType, ContentType
 from magic_pdf.data.dataset import BaseDataset
-from magic_pdf.data.data_reader_writer import DataWriter
+from magic_pdf.data.filebase import FileBasedDataWriter
 from magic_pdf.libs.bbox import (
     calculate_overlap_area_in_bbox1_area_ratio,
     __is_overlaps_y_exceeds_threshold,
 )
 from magic_pdf.model.magic_model import MagicModel
 from magic_pdf.libs.clean_memory import clean_memory
-from magic_pdf.pre_proc.cut import _cut_image_and_table
-from magic_pdf.pre_proc.bboxes_detection import _prepare_bboxes_for_layout_split
-from magic_pdf.pre_proc.dict_merge import (
-    _fill_spans_in_blocks,
-    _fix_block_spans,
-    _fix_discarded_block,
-)
-from magic_pdf.pre_proc.span_list_modification import (
-    _get_qa_need_list,
-    _remove_overlaps_low_confidence_spans,
-    _remove_overlaps_min_spans,
-)
+from magic_pdf.libs.cut import _cut_image_and_table
+from magic_pdf.libs.detection import _prepare_bboxes_for_layout_split
 from magic_pdf.model.monkeyocr import MonkeyOCR
 from magic_pdf.model.sub_modules.relation_prediction.xycut import _recursive_xy_cut
 from magic_pdf.model.sub_modules.relation_prediction.layoutlmv3 import (
-    run_rel_pred,
+    RelationPrediction,
+)
+from magic_pdf.libs.span import (
+    _remove_overlaps_low_confidence_spans,
+    _remove_overlaps_min_spans,
+    _get_qa_need_list,
+)
+from magic_pdf.libs.merge import (
+    _fill_spans_in_blocks,
+    _fix_discarded_block,
+    _fix_block_spans,
 )
 
 
@@ -193,16 +192,23 @@ def _sort(
     page_w,
     page_h,
     line_height,
-    rel_pred: nn.Module,
+    rel_pred_model: nn.Module,
 ):
-    page_line_list = []
+    bboxes = []
 
-    def add_lines_to_block(b):
-        line_bboxes = _insert_lines_into_block(b["bbox"], line_height, page_w, page_h)
-        b["lines"] = []
+    def __add_lines_to_block(
+        block,
+    ):
+        line_bboxes = _insert_lines_into_block(
+            block_bbox=block["bbox"],
+            line_height=line_height,
+            page_w=page_w,
+            page_h=page_h,
+        )
+        block["lines"] = []
         for line_bbox in line_bboxes:
-            b["lines"].append({"bbox": line_bbox, "spans": []})
-        page_line_list.extend(line_bboxes)
+            block["lines"].append({"bbox": line_bbox, "spans": []})
+        bboxes.extend(line_bboxes)
 
     for block in fix_blocks:
         if block["type"] in [
@@ -214,66 +220,39 @@ def _sort(
             BlockType.TableFootnote,
         ]:
             if len(block["lines"]) == 0:
-                add_lines_to_block(block)
-            elif block["type"] in [BlockType.Title] and len(block["lines"]) == 1 and (block["bbox"][3] - block["bbox"][1]) > line_height * 2:
+                __add_lines_to_block(block)
+            elif (
+                block["type"] in [
+                    BlockType.Title,
+                ]
+                and len(block["lines"]) == 1
+                and (block["bbox"][3] - block["bbox"][1]) > line_height * 2
+            ):
                 block["real_lines"] = copy.deepcopy(block["lines"])
-                add_lines_to_block(block)
+                __add_lines_to_block(block)
             else:
                 for line in block["lines"]:
                     bbox = line["bbox"]
-                    page_line_list.append(bbox)
+                    bboxes.append(bbox)
         elif block["type"] in [
             BlockType.ImageBody,
             BlockType.TableBody,
             BlockType.InterlineEquation,
         ]:
             block["real_lines"] = copy.deepcopy(block["lines"])
-            add_lines_to_block(block)
+            __add_lines_to_block(block)
 
-    if len(page_line_list) > 200:
+    if len(bboxes) > 200:
         return None
 
-    x_scale = 1000. / page_w
-    y_scale = 1000. / page_h
-    boxes = []
-    # logger.info(f"Scale: {x_scale}, {y_scale}, Boxes len: {len(page_line_list)}")
-    for left, top, right, bottom in page_line_list:
-        if left < 0:
-            logger.warning(
-                f"left < 0, left: {left}, right: {right}, top: {top}, bottom: {bottom}, page_w: {page_w}, page_h: {page_h}"
-            )  # noqa: E501
-            left = 0
-        if right > page_w:
-            logger.warning(
-                f"right > page_w, left: {left}, right: {right}, top: {top}, bottom: {bottom}, page_w: {page_w}, page_h: {page_h}"
-            )  # noqa: E501
-            right = page_w
-        if top < 0:
-            logger.warning(
-                f"top < 0, left: {left}, right: {right}, top: {top}, bottom: {bottom}, page_w: {page_w}, page_h: {page_h}"
-            )  # noqa: E501
-            top = 0
-        if bottom > page_h:
-            logger.warning(
-                f"bottom > page_h, left: {left}, right: {right}, top: {top}, bottom: {bottom}, page_w: {page_w}, page_h: {page_h}"
-            )  # noqa: E501
-            bottom = page_h
-
-        left = round(left * x_scale)
-        top = round(top * y_scale)
-        right = round(right * x_scale)
-        bottom = round(bottom * y_scale)
-        assert (
-            1000 >= right >= left >= 0 and 1000 >= bottom >= top >= 0
-        ), f"Invalid box. right: {right}, left: {left}, bottom: {bottom}, top: {top}"  # noqa: E126, E121
-        boxes.append([left, top, right, bottom])
-
-    with torch.inference_mode():
-        orders = run_rel_pred(
-            boxes,
-            model=rel_pred,
-        )
-    sorted_bboxes = [page_line_list[i] for i in orders]
+    rel_pred = RelationPrediction(
+        model=rel_pred_model,
+    )
+    sorted_bboxes = rel_pred(
+        bboxes=bboxes,
+        width=page_w,
+        height=page_h,
+    )
     return sorted_bboxes
 
 
@@ -495,7 +474,7 @@ def _para_split(pdf_info_dict):
 def postprocess(
     model_list: List[Dict[str, Any]],
     dataset: BaseDataset,
-    image_writer: DataWriter,
+    image_writer: FileBasedDataWriter,
     monkeyocr: MonkeyOCR,
     debug_mode=False,
     need_drop = False,  # Fixed.
@@ -612,7 +591,7 @@ def postprocess(
             page_w=page_w,
             page_h=page_h,
             line_height=line_height,
-            rel_pred=monkeyocr.rel_pred,
+            rel_pred_model=monkeyocr.rel_pred,
         )  # Relation prediction.
         fix_blocks = _calculate_block_index(
             fix_blocks=fix_blocks,

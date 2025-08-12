@@ -1,5 +1,5 @@
 import fitz
-from magic_pdf.config.ocr_content_type import (
+from magic_pdf.config import (
     BlockType,
     CategoryId,
     ContentType,

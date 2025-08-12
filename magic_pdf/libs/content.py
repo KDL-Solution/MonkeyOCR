@@ -1,15 +1,9 @@
 import re
 from loguru import logger
 
-from magic_pdf.config.make_content_config import DropMode, MakeMode
-from magic_pdf.config.ocr_content_type import BlockType, ContentType
+from magic_pdf.config import Mode, BlockType, ContentType
 from magic_pdf.libs.commons import join_path
 from magic_pdf.libs.language import detect_lang
-
-
-class ListLineTag:
-    IS_LIST_START_LINE = 'is_list_start_line'
-    IS_LIST_END_LINE = 'is_list_end_line'
 
 
 def _ocr_escape_special_markdown_char(content):
@@ -41,7 +35,7 @@ def _get_title_level(block):
     return title_level
 
 
-def _ocr_mk_markdown_with_para_core(
+def _make_markdown_with_para_core(
     paras_of_layout,
     mode,
     img_buket_path="",
@@ -62,9 +56,7 @@ def _ocr_mk_markdown_with_para_core(
         elif para_type == BlockType.InterlineEquation:
             para_text = _merge_para_with_text(para_block)
         elif para_type == BlockType.Image:
-            if mode == MakeMode.NLP_MD:
-                continue
-            elif mode == MakeMode.MM_MD:
+            if mode == Mode.MARKDOWN:
                 for block in para_block["blocks"]:
                     if block["type"] == BlockType.ImageBody:
                         for line in block["lines"]:
@@ -79,9 +71,7 @@ def _ocr_mk_markdown_with_para_core(
                     if block["type"] == BlockType.ImageFootnote:
                         para_text += _merge_para_with_text(block) + "  \n"
         elif para_type == BlockType.Table:
-            if mode == MakeMode.NLP_MD:
-                continue
-            elif mode == MakeMode.MM_MD:
+            if mode == Mode.MARKDOWN:
                 for block in para_block["blocks"]:
                     if block["type"] == BlockType.TableCaption:
                         para_text += _merge_para_with_text(block) + "  \n"
@@ -121,7 +111,7 @@ def _merge_para_with_text(
 
     para_text = ""
     for i, line in enumerate(para_block["lines"]):
-        if i >= 1 and line.get(ListLineTag.IS_LIST_START_LINE, False):
+        if i >= 1 and line.get("is_list_start_line", False):
             para_text += "  \n"
 
         for j, span in enumerate(line["spans"]):
@@ -234,51 +224,29 @@ def _para_to_standard_format(
 
     if drop_reason is not None:
         para_content["drop_reason"] = drop_reason
-
     return para_content
 
 
 def union_make(
     pdf_info_dict: list,
-    make_mode: str,
-    drop_mode: str,
+    mode: str,
     img_buket_path: str = "",
 ):
     output_content = []
     for page_info in pdf_info_dict:
-        drop_reason = None
-        if page_info.get("need_drop", False):
-            drop_reason = page_info.get("drop_reason")
-            if drop_mode == DropMode.NONE:
-                pass
-            elif drop_mode == DropMode.WHOLE_PDF:
-                raise Exception((f"drop_mode is {DropMode.WHOLE_PDF} ,"
-                                 f"drop_reason is {drop_reason}"))
-            elif drop_mode == DropMode.SINGLE_PAGE:
-                logger.warning((f"drop_mode is {DropMode.SINGLE_PAGE} ,"
-                                f"drop_reason is {drop_reason}"))
-                continue
-            else:
-                raise Exception("drop_mode can not be null")
-
         paras_of_layout = page_info.get("para_blocks")
         page_idx = page_info.get("page_idx")
         if not paras_of_layout:
             continue
-        if make_mode == MakeMode.MM_MD:
-            page_markdown = _ocr_mk_markdown_with_para_core(
+
+        if mode == Mode.MARKDOWN:
+            page_markdown = _make_markdown_with_para_core(
                 paras_of_layout,
-                mode=MakeMode.MM_MD,
+                mode=Mode.MARKDOWN,
                 img_buket_path=img_buket_path,
             )
             output_content.extend(page_markdown)
-        elif make_mode == MakeMode.NLP_MD:
-            page_markdown = _ocr_mk_markdown_with_para_core(
-                paras_of_layout,
-                mode=MakeMode.NLP_MD,
-            )
-            output_content.extend(page_markdown)
-        elif make_mode == MakeMode.STANDARD_FORMAT:
+        elif mode == Mode.STANDARD:
             for para_block in paras_of_layout:
                 para_content = _para_to_standard_format(
                     para_block,
@@ -287,10 +255,9 @@ def union_make(
                 )
                 output_content.append(para_content)
 
-    if make_mode in [
-        MakeMode.MM_MD,
-        MakeMode.NLP_MD,
+    if mode in [
+        Mode.MARKDOWN,
     ]:
         return "\n\n".join(output_content)  # `str`.
-    elif make_mode == MakeMode.STANDARD_FORMAT:
+    elif mode == Mode.STANDARD:
         return output_content

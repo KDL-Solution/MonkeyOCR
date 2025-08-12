@@ -1,5 +1,4 @@
-from magic_pdf.config.drop_tag import DropTag
-from magic_pdf.config.ocr_content_type import BlockType
+from magic_pdf.config import BlockType, ContentType
 from magic_pdf.libs.bbox import (
     calculate_iou,
     get_minbox_if_overlap_by_ratio,
@@ -30,7 +29,7 @@ def _remove_overlaps_low_confidence_spans(spans):
     if len(dropped_spans) > 0:
         for span_need_remove in dropped_spans:
             spans.remove(span_need_remove)
-            span_need_remove['tag'] = DropTag.SPAN_OVERLAP
+            span_need_remove['tag'] = "span_overlap"
 
     return spans, dropped_spans
 
@@ -53,7 +52,7 @@ def _remove_overlaps_min_spans(spans):
     if len(dropped_spans) > 0:
         for span_need_remove in dropped_spans:
             spans.remove(span_need_remove)
-            span_need_remove['tag'] = DropTag.SPAN_OVERLAP
+            span_need_remove['tag'] = "span_overlap"
     return spans, dropped_spans
 
 
