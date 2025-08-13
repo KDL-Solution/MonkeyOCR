@@ -14,7 +14,7 @@ def _is_in_or_part_overlap(box1, box2) -> bool:
                 y0_1 > y1_2)
 
 
-def _is_in(box1, box2) -> bool:
+def is_in(box1, box2) -> bool:
     x0_1, y0_1, x1_1, y1_1 = box1
     x0_2, y0_2, x1_2, y1_2 = box2
 
@@ -24,13 +24,13 @@ def _is_in(box1, box2) -> bool:
             y1_1 <= y1_2)
 
 
-def _is_part_overlap(box1, box2) -> bool:
+def is_part_overlap(box1, box2) -> bool:
     if box1 is None or box2 is None:
         return False
-    return _is_in_or_part_overlap(box1, box2) and not _is_in(box1, box2)
+    return _is_in_or_part_overlap(box1, box2) and not is_in(box1, box2)
 
 
-def __is_overlaps_y_exceeds_threshold(
+def is_overlaps_y_exceeds_threshold(
     bbox1,
     bbox2,
     overlap_ratio_threshold=0.8,

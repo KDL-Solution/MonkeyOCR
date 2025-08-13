@@ -6,8 +6,7 @@ from loguru import logger
 from typing import List, Dict, Any
 from pathlib import Path
 
-from magic_pdf.data.dataset import BaseDataset
-from magic_pdf.data.filebase import FileBasedDataWriter
+from magic_pdf.libs.data import PDFDataset, DataWriter
 from magic_pdf.libs.clean_memory import clean_memory
 from magic_pdf.model.vram import clean_vram
 from magic_pdf.model.monkeyocr import MonkeyOCR
@@ -34,7 +33,7 @@ class ConversionResult:
     def __init__(
         self,
         postprocess_out,
-        dataset: BaseDataset,
+        dataset: PDFDataset,
     ):
         self._pipe_res = postprocess_out
         self._dataset = dataset
@@ -141,7 +140,7 @@ class ConversionResult:
 
     def dump_model(
         self,
-        writer: FileBasedDataWriter,
+        writer: DataWriter,
         save_path: str,
         indent: int = 2,
     ):
@@ -163,7 +162,7 @@ class ConversionResult:
 class Conversion:
     def __init__(
         self,
-        image_writer: FileBasedDataWriter,
+        image_writer: DataWriter,
         monkeyocr: MonkeyOCR,
     ):
         self.image_writer = image_writer
@@ -172,7 +171,7 @@ class Conversion:
     def make_result(
         self,
         llm_post_out: List[Dict[str, Any]],
-        dataset: BaseDataset,
+        dataset: PDFDataset,
         debug_mode=False,
     ) -> ConversionResult:
         postprocess_out = postprocess(
@@ -189,7 +188,7 @@ class Conversion:
 
     def __call__(
         self,
-        dataset: BaseDataset,
+        dataset: PDFDataset,
     ):
         ### Layout detection:
         layout_det_start = time.time()
@@ -246,7 +245,7 @@ class Conversion:
         gc_time = time.time() - gc_start
         logger.info(f"Garbage collection time: {round(gc_time, 2)}")
 
-        ### Relation prediction:
+        ### Relation prediction, etc.:
         rel_pred_start = time.time()
 
         final_out = self.make_result(
@@ -260,5 +259,5 @@ class Conversion:
             f"Relation prediction: {round(rel_pred_time, 2)}s"
             f" ({round(rel_pred_speed, 2)}s/pages)"
         )
-        ### : Relation prediction
+        ### : Relation prediction, etc.
         return final_out

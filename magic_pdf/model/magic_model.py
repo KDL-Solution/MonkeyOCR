@@ -2,13 +2,13 @@ import enum
 from typing import List, Dict, Any
 
 from magic_pdf.config import ModelBlockType, CategoryId, ContentType
-from magic_pdf.data.dataset import BaseDataset
+from magic_pdf.libs.data import PDFDataset, FitzPage
 from magic_pdf.libs.bbox import (
-    _is_in,
+    is_in,
     bbox_distance,
     bbox_relative_pos,
     calculate_iou,
-    _is_part_overlap,
+    is_part_overlap,
 )
 
 
@@ -16,7 +16,7 @@ def _remove_overlap_between_bbox(
     bbox1,
     bbox2,
 ):
-    if _is_part_overlap(bbox1, bbox2):
+    if is_part_overlap(bbox1, bbox2):
         ix0, iy0, ix1, iy1 = bbox1
         x0, y0, x1, y1 = bbox2
 
@@ -52,20 +52,6 @@ def _remove_overlap_between_bbox(
         return bbox1, bbox2
 
 
-def get_scale_ratio(
-    model_page_info,
-    page,
-):
-    pix = page.get_pixmap(dpi=72)
-    pymu_width = int(pix.w)
-    pymu_height = int(pix.h)
-    width_from_json = model_page_info["page_info"]["width"]
-    height_from_json = model_page_info["page_info"]["height"]
-    horizontal_scale_ratio = width_from_json / pymu_width
-    vertical_scale_ratio = height_from_json / pymu_height
-    return horizontal_scale_ratio, vertical_scale_ratio
-
-
 class PosRelationEnum(enum.Enum):
     LEFT = "left"
     RIGHT = "right"
@@ -78,24 +64,39 @@ class MagicModel:
     def __init__(
         self,
         model_list: List[Dict[str, Any]],
-        dataset: BaseDataset,
+        dataset: PDFDataset,
     ):
         self.model_list = model_list
         self.dataset = dataset
-        self.__fix_axis()
-        self.__fix_by_remove_low_confidence()
-        self.__fix_by_remove_high_iou_and_low_confidence()
-        self.__fix_footnote()
+        self._fix_axis()
+        self._fix_by_remove_low_confidence()
+        self._fix_by_remove_high_iou_and_low_confidence()
+        self._fix_footnote()
 
-    def __fix_axis(
+    def __get_scale_ratio(
+        self,
+        model_page_info,
+        page: FitzPage,
+    ):
+        # pix = page.get_pixmap(dpi=72)
+        pix = page.page.get_pixmap(dpi=72)
+        pymu_width = int(pix.w)
+        pymu_height = int(pix.h)
+        width_from_json = model_page_info["page_info"]["width"]
+        height_from_json = model_page_info["page_info"]["height"]
+        horizontal_scale_ratio = width_from_json / pymu_width
+        vertical_scale_ratio = height_from_json / pymu_height
+        return horizontal_scale_ratio, vertical_scale_ratio
+
+    def _fix_axis(
         self,
     ):
         for model_page_info in self.model_list:
             need_remove_list = []
-            page_no = model_page_info["page_info"]["page_no"]
-            horizontal_scale_ratio, vertical_scale_ratio = get_scale_ratio(
+            page_num = model_page_info["page_info"]["page_num"]
+            horizontal_scale_ratio, vertical_scale_ratio = self.__get_scale_ratio(
                 model_page_info,
-                page=self.dataset.get_page(page_no),
+                page=self.dataset.get_page(page_num),
             )
             layout_dets = model_page_info["layout_dets"]
             for layout_det in layout_dets:
@@ -117,7 +118,7 @@ class MagicModel:
             for need_remove in need_remove_list:
                 layout_dets.remove(need_remove)
 
-    def __fix_by_remove_low_confidence(self):
+    def _fix_by_remove_low_confidence(self):
         for model_page_info in self.model_list:
             need_remove_list = []
             layout_dets = model_page_info["layout_dets"]
@@ -129,7 +130,7 @@ class MagicModel:
             for need_remove in need_remove_list:
                 layout_dets.remove(need_remove)
 
-    def __fix_by_remove_high_iou_and_low_confidence(self):
+    def _fix_by_remove_high_iou_and_low_confidence(self):
         for model_page_info in self.model_list:
             need_remove_list = []
             layout_dets = model_page_info["layout_dets"]
@@ -188,7 +189,7 @@ class MagicModel:
             return float("inf")
         return bbox_distance(bbox1, bbox2)
 
-    def __fix_footnote(
+    def _fix_footnote(
         self,
     ):
         # 3: figure, 5: table, 7: footnote
@@ -259,13 +260,13 @@ class MagicModel:
             for j in range(N):
                 if i == j:
                     continue
-                if _is_in(bboxes[i]["bbox"], bboxes[j]["bbox"]):
+                if is_in(bboxes[i]["bbox"], bboxes[j]["bbox"]):
                     keep[i] = False
         return [bboxes[i] for i in range(N) if keep[i]]
 
     def __tie_up_category_by_distance(
         self,
-        page_no: int,
+        page_num: int,
         subject_category_id: int,
         object_category_id: int,
         priority_pos: PosRelationEnum,
@@ -273,7 +274,7 @@ class MagicModel:
         """_summary_
 
         Args:
-            page_no (int): _description_
+            page_num (int): _description_
             subject_category_id (int): _description_
             object_category_id (int): _description_
             priority_pos (PosRelationEnum): _description_
@@ -288,7 +289,7 @@ class MagicModel:
                     lambda x: {"bbox": x["bbox"], "score": x["score"]},
                     filter(
                         lambda x: x["category_id"] == subject_category_id,
-                        self.model_list[page_no]["layout_dets"],
+                        self.model_list[page_num]["layout_dets"],
                     ),
                 )
             )
@@ -300,7 +301,7 @@ class MagicModel:
                     lambda x: {"bbox": x["bbox"], "score": x["score"]},
                     filter(
                         lambda x: x["category_id"] == object_category_id,
-                        self.model_list[page_no]["layout_dets"],
+                        self.model_list[page_num]["layout_dets"],
                     ),
                 )
             )
@@ -510,13 +511,13 @@ class MagicModel:
 
     def get_images(
         self,
-        page_no: int,
+        page_num: int,
     ) -> List[Dict[str, Any]]:
         with_captions = self.__tie_up_category_by_distance(
-            page_no, 3, 4, PosRelationEnum.BOTTOM
+            page_num, 3, 4, PosRelationEnum.BOTTOM
         )
         with_footnotes = self.__tie_up_category_by_distance(
-            page_no, 3, CategoryId.ImageFootnote, PosRelationEnum.ALL
+            page_num, 3, CategoryId.ImageFootnote, PosRelationEnum.ALL
         )
         ret = []
         for v in with_captions:
@@ -532,13 +533,19 @@ class MagicModel:
 
     def get_tables(
         self,
-        page_no: int,
+        page_num: int,
     ) -> List[Dict[str, Any]]:
         with_captions = self.__tie_up_category_by_distance(
-            page_no, 5, 6, PosRelationEnum.UP
+            page_num,
+            5,
+            6,
+            PosRelationEnum.UP,
         )
         with_footnotes = self.__tie_up_category_by_distance(
-            page_no, 5, 7, PosRelationEnum.ALL
+            page_num,
+            5,
+            7,
+            PosRelationEnum.ALL,
         )
         ret = []
         for v in with_captions:
@@ -552,15 +559,18 @@ class MagicModel:
             ret.append(record)
         return ret
 
-    def __get_blocks_by_type(
-        self, type: int, page_no: int, extra_col: List[str] = []
+    def _get_blocks_by_type(
+        self,
+        type: int,
+        page_num: int,
+        extra_col: List[str] = [],
     ) -> List:
         blocks = []
         for page_dict in self.model_list:
             layout_dets = page_dict.get("layout_dets", [])
             page_info = page_dict.get("page_info", {})
-            page_number = page_info.get("page_no", -1)
-            if page_no != page_number:
+            page_number = page_info.get("page_num", -1)
+            if page_num != page_number:
                 continue
             for item in layout_dets:
                 category_id = item.get("category_id", -1)
@@ -578,35 +588,43 @@ class MagicModel:
 
     def get_model_list(
         self,
-        page_no: int,
+        page_num: int,
     ):
-        return self.model_list[page_no]
+        return self.model_list[page_num]
 
-    def get_equations(self, page_no: int) -> List:
-        inline_equations = self.__get_blocks_by_type(
-            ModelBlockType.EMBEDDING.value, page_no, ["latex"]
+    def _get_equations(
+        self,
+        page_num: int,
+    ) -> List:
+        inline_equations = self._get_blocks_by_type(
+            ModelBlockType.EMBEDDING.value,
+            page_num,
+            ["latex"],
         )
-        interline_equations = self.__get_blocks_by_type(
-            ModelBlockType.ISOLATED.value, page_no, ["latex"]
+        interline_equations = self._get_blocks_by_type(
+            ModelBlockType.ISOLATED.value,
+            page_num,
+            ["latex"],
         )
-        interline_equations_blocks = self.__get_blocks_by_type(
-            ModelBlockType.ISOLATE_FORMULA.value, page_no
+        interline_equations_blocks = self._get_blocks_by_type(
+            ModelBlockType.ISOLATE_FORMULA.value,
+            page_num,
         )
         return inline_equations, interline_equations, interline_equations_blocks
 
-    def get_discarded(self, page_no: int) -> List:
-        blocks = self.__get_blocks_by_type(ModelBlockType.ABANDON.value, page_no)
+    def _get_discarded(self, page_num: int) -> List:
+        blocks = self._get_blocks_by_type(ModelBlockType.ABANDON.value, page_num)
         return blocks
 
-    def get_text_blocks(self, page_no: int) -> List:
-        blocks = self.__get_blocks_by_type(ModelBlockType.PLAIN_TEXT.value, page_no)
+    def _get_text_blocks(self, page_num: int) -> List:
+        blocks = self._get_blocks_by_type(ModelBlockType.PLAIN_TEXT.value, page_num)
         return blocks
 
-    def get_title_blocks(self, page_no: int) -> List:
-        blocks = self.__get_blocks_by_type(ModelBlockType.TITLE.value, page_no)
+    def _get_title_blocks(self, page_num: int) -> List:
+        blocks = self._get_blocks_by_type(ModelBlockType.TITLE.value, page_num)
         return blocks
 
-    def get_all_spans(self, page_no: int) -> List:
+    def get_all_spans(self, page_num: int) -> List:
         def remove_duplicate_spans(spans):
             new_spans = []
             for span in spans:
@@ -615,7 +633,7 @@ class MagicModel:
             return new_spans
 
         all_spans = []
-        model_page_info = self.model_list[page_no]
+        model_page_info = self.model_list[page_num]
         layout_dets = model_page_info["layout_dets"]
         allow_category_id_list = [3, 5, 13, 14, 15]
 
@@ -646,8 +664,11 @@ class MagicModel:
                 all_spans.append(span)
         return remove_duplicate_spans(all_spans)
 
-    def get_page_size(self, page_no: int):
-        page = self.dataset.get_page(page_no).get_page_info()
+    def get_page_size(
+        self,
+        page_num: int,
+    ):
+        page = self.dataset.get_page(page_num).get_page_info()
         page_w = page.w
         page_h = page.h
         return page_w, page_h

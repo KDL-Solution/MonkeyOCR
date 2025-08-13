@@ -5,7 +5,7 @@ from loguru import logger
 from magic_pdf.config import BlockType, ContentType
 from magic_pdf.libs.bbox import (
     calculate_overlap_area_in_bbox1_area_ratio,
-    __is_overlaps_y_exceeds_threshold,
+    is_overlaps_y_exceeds_threshold,
 )
 
 
@@ -55,7 +55,7 @@ def _merge_spans_to_line(
                 continue
 
 
-            if __is_overlaps_y_exceeds_threshold(span['bbox'], current_line[-1]['bbox'], threshold):
+            if is_overlaps_y_exceeds_threshold(span['bbox'], current_line[-1]['bbox'], threshold):
                 current_line.append(span)
             else:
 
@@ -69,7 +69,7 @@ def _merge_spans_to_line(
         return lines
 
 
-def _fill_spans_in_blocks(
+def fill_spans_in_blocks(
     blocks,
     spans,
     ratio: float,
@@ -130,7 +130,7 @@ def _fix_text_block(
     return block
 
 
-def _fix_block_spans(
+def fix_block_spans(
     block_with_spans,
 ):
     fix_blocks = []
@@ -154,7 +154,7 @@ def _fix_block_spans(
     return fix_blocks
 
 
-def _fix_discarded_block(
+def fix_discarded_block(
     discarded_block_with_spans,
 ):
     fix_discarded_blocks = []

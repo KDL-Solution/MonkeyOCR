@@ -63,7 +63,7 @@ def __split_projection_profile(
     return arr_start, arr_end
 
 
-def _recursive_xy_cut(
+def recursive_xy_cut(
     boxes: np.ndarray,
     indices: List[int],
     res: List[int],
@@ -108,6 +108,6 @@ def _recursive_xy_cut(
             _indices = (c0 <= x_sorted_boxes_chunk[:, 0]) & (
                 x_sorted_boxes_chunk[:, 0] < c1
             )
-            _recursive_xy_cut(
+            recursive_xy_cut(
                 x_sorted_boxes_chunk[_indices], x_sorted_indices_chunk[_indices], res
             )

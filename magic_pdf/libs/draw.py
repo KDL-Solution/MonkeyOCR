@@ -1,10 +1,11 @@
 import fitz
+
 from magic_pdf.config import (
     BlockType,
     CategoryId,
     ContentType,
 )
-from magic_pdf.data.dataset import BaseDataset
+from magic_pdf.libs.data import PDFDataset
 from magic_pdf.model.magic_model import MagicModel
 
 
@@ -308,7 +309,7 @@ def draw_spans(
 
 def draw_model_bbox(
     conv_results,
-    dataset: BaseDataset,
+    dataset: PDFDataset,
     save_path: str,
 ):
     dropped_bbox_list = []
@@ -329,7 +330,7 @@ def draw_model_bbox(
         texts = []
         interequations = []
         page_info = magic_model.get_model_list(
-            page_no=i,
+            page_num=i,
         )
         layout_dets = page_info["layout_dets"]
         for layout_det in layout_dets:

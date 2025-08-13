@@ -1,14 +1,15 @@
-import os
 import time
-import argparse
 import sys
 import logging
 import fitz
 from typing import List
 from pathlib import Path
 
-from magic_pdf.data.filebase import FileBasedDataWriter, FileBasedDataReader
-from magic_pdf.data.dataset import PDFDataset
+from magic_pdf.libs.data import (
+    PDFDataset,
+    DataWriter,
+    DataReader,
+)
 from magic_pdf.model.conversion import Conversion
 from magic_pdf.model.monkeyocr import MonkeyOCR
 
@@ -29,63 +30,7 @@ def _to_pdf_bytes(
     return doc.tobytes()
 
 
-def _pdf_to_image_bytes_ls(
-    pdf_path: str,
-) -> List[bytes]:
-    doc = fitz.open(pdf_path)
-    image_bytes_list = []
-
-    for page_index in range(len(doc)):
-        page = doc.load_page(page_index)
-        pix = page.get_pixmap(dpi=200)  # 해상도 조절 가능
-
-        # Pixmap → PNG bytes
-        image_bytes = pix.tobytes("png")  # "ppm"도 가능
-        image_bytes_list.append(image_bytes)
-    return image_bytes_list
-
-
-def document_convert_folder(
-    in_folder: str,
-    save_dir: str,
-    monkeyocr: MonkeyOCR,
-):
-    in_folder = Path(in_folder)
-    save_dir = Path(save_dir) / in_folder.stem
-
-    image_paths = [
-        i.as_posix()
-        for i in in_folder.glob("*")
-        if "@eaDir" not in i.as_posix()
-    ]
-    reader = FileBasedDataReader()
-    document_convert(
-        [reader.read_at(i) for i in image_paths],
-        save_dir=save_dir.as_posix(),
-        monkeyocr=monkeyocr,
-    )
-    return save_dir.as_posix()
-
-
-def document_convert_pdf(
-    pdf_path: str,
-    save_dir: str,
-    monkeyocr: MonkeyOCR,
-):
-    save_dir = Path(save_dir) / Path(pdf_path).stem
-
-    image_bytes_ls = _pdf_to_image_bytes_ls(
-        pdf_path=pdf_path,
-    )
-    document_convert(
-        image_bytes_ls,
-        save_dir=save_dir.as_posix(),
-        monkeyocr=monkeyocr,
-    )
-    return save_dir.as_posix()
-
-
-def document_convert(
+def convert(
     image_bytes_ls: List[bytes],
     save_dir: str,
     monkeyocr: MonkeyOCR,
@@ -108,7 +53,7 @@ def document_convert(
     print("Performing document conversion...")
     conv_start = time.time()
 
-    image_writer = FileBasedDataWriter(
+    image_writer = DataWriter(
         parent_dir=images_dir.as_posix(),
     )
     conv = Conversion(
@@ -142,59 +87,92 @@ def document_convert(
         )
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="PDF Document Parsing Tool",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+def convert_folder(
+    in_folder: str,
+    save_dir: str,
+    monkeyocr: MonkeyOCR,
+):
+    in_folder = Path(in_folder)
+    save_dir = Path(save_dir) / in_folder.stem
+
+    image_paths = [
+        i.as_posix()
+        for i in in_folder.glob("*")
+        if "@eaDir" not in i.as_posix()
+    ]
+    reader = DataReader()
+    convert(
+        [reader.read_at(i) for i in image_paths],
+        save_dir=save_dir.as_posix(),
+        monkeyocr=monkeyocr,
     )
-    parser.add_argument(
-        "input_path",
-        help="Input PDF/image file path or folder path"
+    return save_dir.as_posix()
+
+
+def _pdf_to_image_bytes_ls(
+    pdf_path: str,
+) -> List[bytes]:
+    doc = fitz.open(pdf_path)
+    image_bytes_list = []
+
+    for page_index in range(len(doc)):
+        page = doc.load_page(page_index)
+        pix = page.get_pixmap(dpi=200)  # 해상도 조절 가능
+
+        # Pixmap → PNG bytes
+        image_bytes = pix.tobytes("png")  # "ppm"도 가능
+        image_bytes_list.append(image_bytes)
+    return image_bytes_list
+
+
+def convert_pdf(
+    pdf_path: str,
+    save_dir: str,
+    monkeyocr: MonkeyOCR,
+):
+    save_dir = Path(save_dir) / Path(pdf_path).stem
+
+    image_bytes_ls = _pdf_to_image_bytes_ls(
+        pdf_path=pdf_path,
     )
-    parser.add_argument(
-        "--save_dir",
-        default="./output",
-        help="Output directory (default: ./output)"
+    convert(
+        image_bytes_ls,
+        save_dir=save_dir.as_posix(),
+        monkeyocr=monkeyocr,
     )
-    
-    parser.add_argument(
-        "-c", "--config",
-        default="model_configs.yaml",
-        help="Configuration file path (default: model_configs.yaml)"
-    )
-    parser.add_argument(
-        "--log-level",
-        default="INFO",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-        help="Set the logging level (default: INFO)"
-    )
-    
-    args = parser.parse_args()
-    
+    return save_dir.as_posix()
+
+
+def main(
+    in_path: str,
+    save_dir: str = "./output",
+    config_path: str = "./model_configs.yaml", 
+    log_level: str = "INFO",
+) -> None:
     logging.basicConfig(
-        level=args.log_level,
+        level=log_level,
         format='%(asctime)s - %(levelname)s - %(message)s',
         handlers=[logging.StreamHandler(sys.stdout)]
     )
     monkeyocr = MonkeyOCR(
-        args.config,
+        config_path,
     )
-
     # try:
-    if not os.path.exists(args.input_path):
-        raise FileNotFoundError(f"Input file does not exist: {args.input_path}")
+    in_path = Path(in_path)
+    if not in_path.exists():
+        raise FileNotFoundError(f"Input file does not exist: {in_path.as_posix()}")
 
-    if os.path.isdir(args.input_path):
-        result_dir = document_convert_folder(
-            args.input_path,
-            args.save_dir,
+    if in_path.is_dir():
+        result_dir = convert_folder(
+            in_path.as_posix(),
+            save_dir,
             monkeyocr,
         )
-    elif os.path.isfile(args.input_path):
-        if Path(args.input_path).suffix == ".pdf":
-            result_dir = document_convert_pdf(
-                pdf_path=args.input_path,
-                save_dir=args.save_dir,
+    elif in_path.is_file():
+        if in_path.suffix == ".pdf":
+            result_dir = convert_pdf(
+                pdf_path=in_path.as_posix(),
+                save_dir=save_dir,
                 monkeyocr=monkeyocr,
             )
     print(f"\n✅ Parsing completed! Results saved in: {result_dir}")
@@ -221,4 +199,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    from fire import Fire
+
+    Fire(
+        main,
+    )

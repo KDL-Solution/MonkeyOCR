@@ -5,7 +5,7 @@ from magic_pdf.libs.bbox import (
 )
 
 
-def _remove_overlaps_low_confidence_spans(spans):
+def remove_overlaps_low_confidence_spans(spans):
     dropped_spans = []
 
     for span1 in spans:
@@ -34,7 +34,7 @@ def _remove_overlaps_low_confidence_spans(spans):
     return spans, dropped_spans
 
 
-def _remove_overlaps_min_spans(spans):
+def remove_overlaps_min_spans(spans):
     dropped_spans = []
 
     for span1 in spans:
@@ -56,7 +56,7 @@ def _remove_overlaps_min_spans(spans):
     return spans, dropped_spans
 
 
-def _get_qa_need_list(blocks):
+def get_qa_need_list(blocks):
     images = []
     tables = []
     interline_equations = []

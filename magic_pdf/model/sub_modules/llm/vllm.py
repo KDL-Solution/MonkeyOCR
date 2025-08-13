@@ -2,7 +2,7 @@ import copy
 from loguru import logger
 from typing import List, Dict, Any
 
-from magic_pdf.data.dataset import BaseDataset
+from magic_pdf.libs.data import PDFDataset
 from magic_pdf.config import CategoryId, PromptConfig
 
 
@@ -60,7 +60,7 @@ def run_llm(
 
 
 def llm_post(
-    dataset: BaseDataset,
+    dataset: PDFDataset,
     layout_det_out,
     llm_out,
     page_indices,
@@ -106,14 +106,16 @@ def llm_post(
     #     f"llm ocr time: {round(time.time() - llm_start, 2)}, image num: {len(page_indices)}"
     # )
     final_out = []
-    for index in range(len(dataset)):  # Same as # pages.
-        page_data = dataset.get_page(index)
+    for page_num in range(len(dataset)):  # Same as # pages.
+        page_data = dataset.get_page(
+            page_num,
+        )
         img_dict = page_data.get_image()
         final_out.append(
             {
                 "layout_dets": layout_det_out.pop(0),
                 "page_info": {
-                    "page_no": index,
+                    "page_num": page_num,
                     "height": img_dict["height"],  # page height
                     "width": img_dict["width"],  # page width
                 },

@@ -5,7 +5,7 @@ from loguru import logger
 
 from magic_pdf.config import ContentType
 from magic_pdf.libs.commons import join_path
-from magic_pdf.data.filebase import FileBasedDataWriter
+from magic_pdf.libs.data import DataWriter, FitzPage
 
 
 def _compute_sha256(
@@ -22,7 +22,7 @@ def _cut_image(
     page_num: int,
     page: fitz.Page,
     return_path,
-    imageWriter: FileBasedDataWriter,
+    image_writer: DataWriter,
 ):
     filename = f'{page_num}_{int(bbox[0])}_{int(bbox[1])}_{int(bbox[2])}_{int(bbox[3])}'
     img_path = join_path(
@@ -35,7 +35,7 @@ def _cut_image(
     zoom = fitz.Matrix(3, 3)
     pix = page.get_pixmap(clip=rect, matrix=zoom)
     byte_data = pix.tobytes(output='jpeg', jpg_quality=95)
-    imageWriter.write(img_hash256_path, byte_data)
+    image_writer.write(img_hash256_path, byte_data)
     return img_hash256_path
 
 
@@ -48,12 +48,12 @@ def _validate_bbox(
     return True
 
 
-def _cut_image_and_table(
+def cut_image_and_table(
     spans,
-    fitz_page,
-    page_id,
+    page: FitzPage,
+    page_idx: int,
     md5: str,
-    image_writer,
+    image_writer: DataWriter,
 ):
     for span in spans:
         span_type = span["type"]
@@ -62,12 +62,12 @@ def _cut_image_and_table(
                 continue
             span["image_path"] = _cut_image(
                 span["bbox"],
-                page_id,
-                fitz_page,
+                page_idx,
+                page,
                 return_path=join_path(
                     md5,
                     "images",
                 ),
-                imageWriter=image_writer,
+                image_writer=image_writer,
             )
     return spans

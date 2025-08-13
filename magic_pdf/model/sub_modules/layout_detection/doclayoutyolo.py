@@ -6,7 +6,7 @@ from typing import List, Dict, Any
 from loguru import logger
 from doclayout_yolo import YOLOv10
 
-from magic_pdf.data.dataset import BaseDataset
+from magic_pdf.libs.data import PDFDataset
 
 
 class DocLayoutYOLO(object):
@@ -72,7 +72,7 @@ def crop(
 
 
 def layout_det_pre(
-    dataset: BaseDataset,
+    dataset: PDFDataset,
 ) -> List[np.ndarray]:
     images = []
     for index in range(len(dataset)):

@@ -9,30 +9,29 @@ from typing import List, Dict, Any, Tuple
 from loguru import logger
 
 from magic_pdf.config import BlockType, ContentType
-from magic_pdf.data.dataset import BaseDataset
-from magic_pdf.data.filebase import FileBasedDataWriter
+from magic_pdf.libs.data import PDFDataset, DataWriter
 from magic_pdf.libs.bbox import (
     calculate_overlap_area_in_bbox1_area_ratio,
-    __is_overlaps_y_exceeds_threshold,
+    is_overlaps_y_exceeds_threshold,
 )
 from magic_pdf.model.magic_model import MagicModel
 from magic_pdf.libs.clean_memory import clean_memory
-from magic_pdf.libs.cut import _cut_image_and_table
-from magic_pdf.libs.detection import _prepare_bboxes_for_layout_split
+from magic_pdf.libs.cut import cut_image_and_table
+from magic_pdf.libs.detection import prepare_bboxes_for_layout_split
 from magic_pdf.model.monkeyocr import MonkeyOCR
-from magic_pdf.model.sub_modules.relation_prediction.xycut import _recursive_xy_cut
+from magic_pdf.model.sub_modules.relation_prediction.xycut import recursive_xy_cut
 from magic_pdf.model.sub_modules.relation_prediction.layoutlmv3 import (
     RelationPrediction,
 )
 from magic_pdf.libs.span import (
-    _remove_overlaps_low_confidence_spans,
-    _remove_overlaps_min_spans,
-    _get_qa_need_list,
+    remove_overlaps_low_confidence_spans,
+    remove_overlaps_min_spans,
+    get_qa_need_list,
 )
-from magic_pdf.libs.merge import (
-    _fill_spans_in_blocks,
-    _fix_discarded_block,
-    _fix_block_spans,
+from magic_pdf.libs.block import (
+    fill_spans_in_blocks,
+    fix_discarded_block,
+    fix_block_spans,
 )
 
 
@@ -49,35 +48,6 @@ def _dict_to_list(input_dict):
     for _, item in input_dict.items():
         items_list.append(item)
     return items_list
-
-
-def _construct_page_component(
-    blocks,
-    layout_bboxes,
-    page_id,
-    page_w,
-    page_h,
-    layout_tree,
-    images,
-    tables,
-    interline_equations,
-    discarded_blocks,
-    need_drop,
-    drop_reason,
-):
-    return {
-        "preproc_blocks": blocks,
-        "layout_bboxes": layout_bboxes,
-        "page_idx": page_id,
-        "page_size": [page_w, page_h],
-        "_layout_tree": layout_tree,
-        "images": images,
-        "tables": tables,
-        "interline_equations": interline_equations,
-        "discarded_blocks": discarded_blocks,
-        "need_drop": need_drop,
-        "drop_reason": drop_reason,
-    }
 
 
 def _calculate_block_index(fix_blocks, sorted_bboxes):
@@ -118,7 +88,7 @@ def _calculate_block_index(fix_blocks, sorted_bboxes):
         random_boxes = np.array(block_bboxes)
         np.random.shuffle(random_boxes)
         res = []
-        _recursive_xy_cut(
+        recursive_xy_cut(
             np.asarray(random_boxes).astype(int),
             np.arange(len(block_bboxes)),
             res,
@@ -418,7 +388,7 @@ def _merge_title_blocks(
         to_remove = []
         for block2 in title_bs:
             if (
-                __is_overlaps_y_exceeds_threshold(block1["bbox"], block2["bbox"], 0.9)
+                is_overlaps_y_exceeds_threshold(block1["bbox"], block2["bbox"], 0.9)
                 and len(block1["lines"]) == 1
                 and len(block2["lines"]) == 1
             ):
@@ -473,8 +443,8 @@ def _para_split(pdf_info_dict):
 
 def postprocess(
     model_list: List[Dict[str, Any]],
-    dataset: BaseDataset,
-    image_writer: FileBasedDataWriter,
+    dataset: PDFDataset,
+    image_writer: DataWriter,
     monkeyocr: MonkeyOCR,
     debug_mode=False,
     need_drop = False,  # Fixed.
@@ -490,16 +460,16 @@ def postprocess(
     start_time = time.time()
 
     pdf_info_dict = {}
-    for page_id, fitz_page in enumerate(dataset):
+    for page_num, page in enumerate(dataset):
         if debug_mode:
             time_now = time.time()
             logger.info(
-                f"page_id: {page_id}, last_page_cost_time: {round(time.time() - start_time, 2)}"
+                f"page number: {page_num}, last_page_cost_time: {round(time.time() - start_time, 2)}"
             )
             start_time = time_now
 
-        image_groups = magic_model.get_images(page_id)
-        table_groups = magic_model.get_tables(page_id)
+        image_groups = magic_model.get_images(page_num)
+        table_groups = magic_model.get_tables(page_num)
         img_body_blocks, img_caption_blocks, img_footnote_blocks = _process_groups(
             image_groups,
             "image_body",
@@ -513,13 +483,13 @@ def postprocess(
             "table_footnote_list",
         )
 
-        discarded_blocks = magic_model.get_discarded(page_id)
-        text_blocks = magic_model.get_text_blocks(page_id)
-        title_blocks = magic_model.get_title_blocks(page_id)
-        _, interline_equations, interline_equation_blocks = magic_model.get_equations(page_id)
-        page_w, page_h = magic_model.get_page_size(page_id)
+        discarded_blocks = magic_model._get_discarded(page_num)
+        text_blocks = magic_model._get_text_blocks(page_num)
+        title_blocks = magic_model._get_title_blocks(page_num)
+        _, interline_equations, interline_equation_blocks = magic_model._get_equations(page_num)
+        page_w, page_h = magic_model.get_page_size(page_num)
 
-        all_bboxes, all_discarded_blocks = _prepare_bboxes_for_layout_split(
+        all_bboxes, all_discarded_blocks = prepare_bboxes_for_layout_split(
             img_body_blocks,
             img_caption_blocks,
             img_footnote_blocks,
@@ -534,28 +504,28 @@ def postprocess(
             page_h,
         )
 
-        spans = magic_model.get_all_spans(page_id)
+        spans = magic_model.get_all_spans(page_num)
         spans = _remove_outside_spans(
             spans,
             all_bboxes,
             all_discarded_blocks,
         )
-        spans, _ = _remove_overlaps_low_confidence_spans(spans)
-        spans, _ = _remove_overlaps_min_spans(spans)
-        discarded_block_with_spans, spans = _fill_spans_in_blocks(
+        spans, _ = remove_overlaps_low_confidence_spans(spans)
+        spans, _ = remove_overlaps_min_spans(spans)
+        discarded_block_with_spans, spans = fill_spans_in_blocks(
             blocks=all_discarded_blocks,
             spans=spans,
             ratio=0.4
         )
-        fix_discarded_blocks = _fix_discarded_block(discarded_block_with_spans)
+        fix_discarded_blocks = fix_discarded_block(discarded_block_with_spans)
 
         if len(all_bboxes) == 0:
-            logger.warning(f"skip this page, not found useful bbox, page_id: {page_id}")
+            logger.warning(f"skip this page, not found useful bbox, page index: {page_num}")
             return 
         (
                 [],
                 [],
-                page_id,
+                page_num,
                 page_w,
                 page_h,
                 [],
@@ -567,19 +537,19 @@ def postprocess(
                 drop_reason,
             )
 
-        spans = _cut_image_and_table(
+        spans = cut_image_and_table(
             spans,
-            fitz_page,
-            page_id,
+            page,
+            page_num,
             md5,
             image_writer,
         )
-        block_with_spans, spans = _fill_spans_in_blocks(
+        block_with_spans, spans = fill_spans_in_blocks(
             blocks=all_bboxes,
             spans=spans,
             ratio=0.5,
         )
-        fix_blocks = _fix_block_spans(block_with_spans)
+        fix_blocks = fix_block_spans(block_with_spans)
 
         _merge_title_blocks(
             fix_blocks,
@@ -604,22 +574,21 @@ def postprocess(
             if block["type"] in [BlockType.Image, BlockType.Table]:
                 block["blocks"] = sorted(block["blocks"], key=lambda b: b["index"])
 
-        images, tables, interline_equations = _get_qa_need_list(sorted_blocks)
-        page_info = _construct_page_component(
-            sorted_blocks,
-            [],
-            page_id,
-            page_w,
-            page_h,
-            [],
-            images,
-            tables,
-            interline_equations,
-            fix_discarded_blocks,
-            need_drop,
-            drop_reason,
-        )
-        pdf_info_dict[f"page_{page_id}"] = page_info
+        images, tables, interline_equations = get_qa_need_list(sorted_blocks)
+        page_info = {
+            "preproc_blocks": sorted_blocks,
+            "layout_bboxes": [],
+            "page_num": page_num,
+            "page_size": [page_w, page_h],
+            "_layout_tree": [],
+            "images": images,
+            "tables": tables,
+            "interline_equations": interline_equations,
+            "discarded_blocks": fix_discarded_blocks,
+            "need_drop": need_drop,
+            "drop_reason": drop_reason,
+        }
+        pdf_info_dict[f"page_{page_num}"] = page_info
 
     _para_split(pdf_info_dict)
 
