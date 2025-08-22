@@ -521,21 +521,22 @@ def postprocess(
 
         if len(all_bboxes) == 0:
             logger.warning(f"skip this page, not found useful bbox, page index: {page_num}")
-            return 
-        (
-                [],
-                [],
-                page_num,
-                page_w,
-                page_h,
-                [],
-                [],
-                [],
-                interline_equations,
-                fix_discarded_blocks,
-                need_drop,
-                drop_reason,
-            )
+            # 빈 페이지 정보를 생성하여 처리 계속
+            page_info = {
+                "preproc_blocks": [],
+                "layout_bboxes": [],
+                "page_num": page_num,
+                "page_size": [page_w, page_h],
+                "_layout_tree": [],
+                "images": [],
+                "tables": [],
+                "interline_equations": interline_equations,
+                "discarded_blocks": fix_discarded_blocks,
+                "need_drop": need_drop,
+                "drop_reason": drop_reason,
+            }
+            pdf_info_dict[f"page_{page_num}"] = page_info
+            continue
 
         spans = cut_image_and_table(
             spans,
